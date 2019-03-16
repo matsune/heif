@@ -1,6 +1,46 @@
 use std::fs::File;
 use std::io::{Read, Result, Seek, SeekFrom};
 
+#[derive(Debug,PartialEq)]
+struct Byte2(u8, u8);
+
+impl Byte2 {
+    fn to_int(&self) -> u16 {
+        ((self.0 as u16) << 4) + (self.1 as u16)
+    }
+}
+
+#[derive(Debug,PartialEq)]
+struct Byte4(u8, u8, u8, u8);
+
+impl Byte4 {
+    fn to_int(&self) -> u32 {
+        ((self.0 as u32) << 12) + ((self.1 as u32) << 8) + ((self.2 as u32) << 4) + (self.3 as u32)
+    }
+
+    fn to_string(&self) -> String {
+        std::str::from_utf8(&[self.0, self.1, self.2, self.3])
+            .unwrap()
+            .to_string()
+    }
+}
+
+#[derive(Debug,PartialEq)]
+struct Byte8(u8, u8, u8, u8, u8, u8, u8, u8);
+
+impl Byte8 {
+    fn to_int(&self) -> u64 {
+        ((self.0 as u64) << 28)
+            + ((self.1 as u64) << 24)
+            + ((self.2 as u64) << 20)
+            + ((self.3 as u64) << 16)
+            + ((self.4 as u64) << 12)
+            + ((self.5 as u64) << 8)
+            + ((self.6 as u64) << 4)
+            + (self.7 as u64)
+    }
+}
+
 struct BitStream {
     file: File,
     bit_offset: u8,
@@ -24,6 +64,29 @@ impl BitStream {
         self.file.read_exact(&mut ch)?;
         self.byte_offset += 1;
         Ok(ch[0])
+    }
+
+    pub fn read_2bytes(&mut self) -> Result<Byte2> {
+        let mut buf: [u8; 2] = [0; 2];
+        self.file.read_exact(&mut buf)?;
+        self.byte_offset += 2;
+        Ok(Byte2(buf[0], buf[1]))
+    }
+
+    pub fn read_4bytes(&mut self) -> Result<Byte4> {
+        let mut buf: [u8; 4] = [0; 4];
+        self.file.read_exact(&mut buf)?;
+        self.byte_offset += 4;
+        Ok(Byte4(buf[0], buf[1], buf[2], buf[3]))
+    }
+
+    pub fn read_8bytes(&mut self) -> Result<Byte8> {
+        let mut buf: [u8; 8] = [0; 8];
+        self.file.read_exact(&mut buf)?;
+        self.byte_offset += 8;
+        Ok(Byte8(
+            buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+        ))
     }
 
     fn is_eof(&self) -> bool {
@@ -50,7 +113,8 @@ impl BitStream {
         let mut return_bits = 0u32;
         let num_bits_left_in_byte = 8 - self.bit_offset;
         if num_bits_left_in_byte >= n {
-            return_bits = (self.current_byte()? as u32 >> (num_bits_left_in_byte - n)) & ((1 << n) - 1);
+            return_bits =
+                (self.current_byte()? as u32 >> (num_bits_left_in_byte - n)) & ((1 << n) - 1);
             self.bit_offset += n;
         } else {
             let mut num_bits_togo = n - num_bits_left_in_byte;
@@ -64,7 +128,8 @@ impl BitStream {
                     num_bits_togo -= 8;
                 } else {
                     return_bits = (return_bits << num_bits_togo)
-                        | ((self.current_byte()? as u32 >> (8 - num_bits_togo)) & ((1 << num_bits_togo) - 1));
+                        | ((self.current_byte()? as u32 >> (8 - num_bits_togo))
+                            & ((1 << num_bits_togo) - 1));
                     self.bit_offset += num_bits_togo;
                     num_bits_togo = 0;
                 }
@@ -98,6 +163,30 @@ mod tests {
     }
 
     #[test]
+    fn test_read_byte2() {
+        let mut stream = new_stream();
+        assert_eq!(stream.read_2bytes().unwrap(), Byte2(0, 1));
+        assert_eq!(stream.byte_offset, 2);
+        assert_eq!(stream.read_2bytes().unwrap(), Byte2(2, 3));
+    }
+
+    #[test]
+    fn test_read_byte4() {
+        let mut stream = new_stream();
+        assert_eq!(stream.read_4bytes().unwrap(), Byte4(0, 1, 2, 3));
+        assert_eq!(stream.byte_offset, 4);
+        assert_eq!(stream.read_4bytes().unwrap(), Byte4(4, 5, 6, 7));
+    }
+
+    #[test]
+    fn test_read_byte8() {
+        let mut stream = new_stream();
+        assert_eq!(stream.read_8bytes().unwrap(), Byte8(0, 1, 2, 3, 4, 5, 6, 7));
+        assert_eq!(stream.byte_offset, 8);
+        assert_eq!(stream.read_8bytes().unwrap(), Byte8(8, 9, 10, 11, 12, 13, 14, 15));
+    }
+
+    #[test]
     fn test_skip_bytes() {
         let mut stream = new_stream();
         assert_eq!(stream.skip_bytes(3).unwrap(), 3);
@@ -123,11 +212,11 @@ mod tests {
         assert_eq!(stream.bit_offset, 5);
         assert_eq!(stream.read_bits(3).unwrap(), 7); // 111
         assert_eq!(stream.bit_offset, 0);
-        assert_eq!(stream.byte_offset, 16); 
-        // 10 11  00010000 00010001 
+        assert_eq!(stream.byte_offset, 16);
+        // 10 11  00010000 00010001
         assert_eq!(stream.read_bits(3).unwrap(), 0); // 000
         assert_eq!(stream.read_bits(10).unwrap(), 514); // 10000 00010
         assert_eq!(stream.bit_offset, 5);
-        assert_eq!(stream.byte_offset, 17); 
+        assert_eq!(stream.byte_offset, 17);
     }
 }
