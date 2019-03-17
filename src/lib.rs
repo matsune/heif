@@ -1,13 +1,13 @@
-mod bit;
 mod bbox;
+mod bit;
 
 use std::fs::File;
-use std::io::{Result};
+use std::io::Result;
 
-use crate::bit::{BitStream};
-use crate::bbox::{BoxHeader};
 use crate::bbox::ftyp::FileTypeBox;
 use crate::bbox::meta::*;
+use crate::bbox::BoxHeader;
+use crate::bit::BitStream;
 
 pub fn load(file_path: &str) -> Result<()> {
     let file = File::open(file_path)?;
@@ -19,16 +19,16 @@ pub fn load(file_path: &str) -> Result<()> {
         let header = BoxHeader::new(&mut stream)?;
         if header.box_type == "ftyp" {
             if ftyp_found {
-              // FIXME
-              panic!("already has ftyp");
+                // FIXME
+                panic!("already has ftyp");
             }
             ftyp_found = true;
             let ft_box = FileTypeBox::new(&mut stream, header)?;
             println!("{:?}", ft_box);
         } else if header.box_type == "meta" {
             if meta_found {
-              // FIXME
-              panic!("already has meta");
+                // FIXME
+                panic!("already has meta");
                 // return Err(HeifError::FileRead);
             }
             meta_found = true;

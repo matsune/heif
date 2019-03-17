@@ -9,11 +9,11 @@ impl Byte2 {
         (u16::from(self.0) << 4) + u16::from(self.1)
     }
 
-    pub fn to_u32(&self) -> u32{
+    pub fn to_u32(&self) -> u32 {
         u32::from(self.to_u16())
     }
 
-    pub fn to_u64(&self) -> u64{
+    pub fn to_u64(&self) -> u64 {
         u64::from(self.to_u16())
     }
 }
@@ -29,7 +29,7 @@ impl Byte4 {
             + u32::from(self.3)
     }
 
-    pub fn to_u64(&self) -> u64{
+    pub fn to_u64(&self) -> u64 {
         u64::from(self.to_u32())
     }
 
@@ -48,7 +48,16 @@ fn test_byte4_to_string() {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Byte8(pub u8, pub u8, pub u8, pub u8, pub u8, pub u8, pub u8, pub u8);
+pub struct Byte8(
+    pub u8,
+    pub u8,
+    pub u8,
+    pub u8,
+    pub u8,
+    pub u8,
+    pub u8,
+    pub u8,
+);
 
 impl Byte8 {
     pub fn to_u64(&self) -> u64 {
@@ -169,7 +178,7 @@ impl BitStream {
         Ok(return_bits)
     }
 
-    pub fn read_zero_term_string(&mut self)->Result<String> {
+    pub fn read_zero_term_string(&mut self) -> Result<String> {
         let mut string = String::new();
         while !self.is_eof() {
             let ch = self.read_byte()?;
@@ -190,7 +199,7 @@ mod tests {
     fn new_stream() -> BitStream {
         // 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
         // 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
-        // 74 68 69 73 20 69 73 20 61 20 73 74 72 69 6E 67 00 
+        // 74 68 69 73 20 69 73 20 61 20 73 74 72 69 6E 67 00
         let file = File::open("./test/test.binary").unwrap();
         BitStream::new(file).unwrap()
     }

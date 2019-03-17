@@ -1,8 +1,8 @@
 pub mod ftyp;
 pub mod meta;
 
-use std::io::Result;
 use crate::bit::*;
+use std::io::Result;
 
 #[derive(Debug)]
 pub struct BoxHeader {
