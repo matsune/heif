@@ -1,5 +1,5 @@
 extern crate heif;
 
 fn main() {
-  heif::load("./examples/sample.heic").unwrap();
+  // heif::load("./examples/sample.heic").unwrap();
 }

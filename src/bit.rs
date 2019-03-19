@@ -1,5 +1,6 @@
+use crate::{HeifError, Result};
 use std::fs::File;
-use std::io::{Read, Result, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 
 #[derive(Debug, PartialEq)]
 pub struct Byte2(pub u8, pub u8);
@@ -43,8 +44,7 @@ impl Byte4 {
 
 #[test]
 fn test_byte4_to_string() {
-    // 66 74 79 70 => ftyp
-    assert_eq!(Byte4(102, 116, 121, 112).to_string(), "ftyp");
+    assert_eq!(Byte4(0x66, 0x74, 0x79, 0x70).to_string(), "ftyp");
 }
 
 #[derive(Debug, PartialEq)]
@@ -74,97 +74,132 @@ impl Byte8 {
 
 #[derive(Debug)]
 pub struct BitStream {
-    file: File,
+    inner: Vec<u8>,
     bit_offset: u8,
-    byte_offset: u64,
-    len: u64,
+    byte_offset: usize,
 }
 
 impl BitStream {
-    pub fn new(file: File) -> Result<BitStream> {
-        let len = file.metadata()?.len();
-        Ok(BitStream {
-            file,
+    pub fn new(inner: Vec<u8>) -> Self {
+        Self {
+            inner,
             bit_offset: 0,
             byte_offset: 0,
-            len,
-        })
+        }
+    }
+
+    pub fn from(file: &mut File) -> Result<Self> {
+        let mut inner = Vec::new();
+        file.read_to_end(&mut inner)
+            .map_err(|_| HeifError::FileRead)?;
+        Ok(BitStream::new(inner))
+    }
+
+    pub fn num_bytes_left(&self) -> usize {
+        self.inner.len() - self.byte_offset
+    }
+
+    pub fn has_bytes(&self, n: usize) -> bool {
+        self.num_bytes_left() >= n
     }
 
     pub fn read_byte(&mut self) -> Result<u8> {
-        let mut ch = [0; 1];
-        self.file.read_exact(&mut ch)?;
+        if !self.has_bytes(1) {
+            return Err(HeifError::EOF);
+        }
+        let byte = self.inner[self.byte_offset];
         self.byte_offset += 1;
-        Ok(ch[0])
+        Ok(byte)
     }
 
     pub fn read_2bytes(&mut self) -> Result<Byte2> {
-        let mut buf: [u8; 2] = [0; 2];
-        self.file.read_exact(&mut buf)?;
+        if !self.has_bytes(2) {
+            return Err(HeifError::EOF);
+        }
+        let byte2 = Byte2(
+            self.inner[self.byte_offset],
+            self.inner[self.byte_offset + 1],
+        );
         self.byte_offset += 2;
-        Ok(Byte2(buf[0], buf[1]))
+        Ok(byte2)
     }
 
     pub fn read_4bytes(&mut self) -> Result<Byte4> {
-        let mut buf: [u8; 4] = [0; 4];
-        self.file.read_exact(&mut buf)?;
+        if !self.has_bytes(4) {
+            return Err(HeifError::EOF);
+        }
+        let byte4 = Byte4(
+            self.inner[self.byte_offset],
+            self.inner[self.byte_offset + 1],
+            self.inner[self.byte_offset + 2],
+            self.inner[self.byte_offset + 3],
+        );
         self.byte_offset += 4;
-        Ok(Byte4(buf[0], buf[1], buf[2], buf[3]))
+        Ok(byte4)
     }
 
     pub fn read_8bytes(&mut self) -> Result<Byte8> {
-        let mut buf: [u8; 8] = [0; 8];
-        self.file.read_exact(&mut buf)?;
+        if !self.has_bytes(8) {
+            return Err(HeifError::EOF);
+        }
+        let byte8 = Byte8(
+            self.inner[self.byte_offset],
+            self.inner[self.byte_offset + 1],
+            self.inner[self.byte_offset + 2],
+            self.inner[self.byte_offset + 3],
+            self.inner[self.byte_offset + 4],
+            self.inner[self.byte_offset + 5],
+            self.inner[self.byte_offset + 6],
+            self.inner[self.byte_offset + 7],
+        );
         self.byte_offset += 8;
-        Ok(Byte8(
-            buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
-        ))
+        Ok(byte8)
     }
 
-    pub fn num_bytes_left(&self) -> u64 {
-        self.len - self.byte_offset
+    pub fn skip_bytes(&mut self, n: usize) -> Result<usize> {
+        let left = self.num_bytes_left();
+        if n >= left {
+            return Err(HeifError::EOF);
+        }
+        self.byte_offset += n;
+        Ok(self.byte_offset)
     }
 
     pub fn is_eof(&self) -> bool {
-        self.byte_offset >= self.len
-    }
-
-    pub fn skip_bytes(&mut self, n: i64) -> Result<u64> {
-        let b = self.byte_offset as i64 + n;
-        self.byte_offset = b as u64;
-        self.file.seek(SeekFrom::Current(n))
+        self.byte_offset >= self.inner.len()
     }
 
     // read byte without seeking
     pub fn current_byte(&mut self) -> Result<u8> {
-        let c = self.read_byte()?;
-        self.skip_bytes(-1)?;
-        Ok(c)
+        if self.is_eof() {
+            return Err(HeifError::EOF);
+        }
+        Ok(self.inner[self.byte_offset])
     }
 
-    pub fn read_bits(&mut self, n: u32) -> Result<u32> {
+    pub fn read_bits(&mut self, n: usize) -> Result<usize> {
         if n == 0 {
             return Ok(0);
         }
-        let mut return_bits = 0u32;
-        let num_bits_left_in_byte = u32::from(8 - self.bit_offset);
+        let mut return_bits = 0;
+        let num_bits_left_in_byte = usize::from(8 - self.bit_offset);
         if num_bits_left_in_byte >= n {
             return_bits =
-                u32::from(self.current_byte()? >> (num_bits_left_in_byte - n)) & ((1 << n) - 1);
+                usize::from(self.current_byte()? >> (num_bits_left_in_byte - n)) & ((1 << n) - 1);
             self.bit_offset += n as u8;
         } else {
             let mut num_bits_togo = n - num_bits_left_in_byte;
-            return_bits = u32::from(self.current_byte()?) & ((1 << num_bits_left_in_byte) - 1);
+            return_bits = usize::from(self.current_byte()?) & ((1 << num_bits_left_in_byte) - 1);
             self.skip_bytes(1)?;
             self.bit_offset = 0;
             while num_bits_togo > 0 {
                 if num_bits_togo > 8 {
-                    return_bits = (return_bits << 8) | u32::from(self.current_byte()?);
+                    return_bits = (return_bits << 8) | usize::from(self.current_byte()?);
                     self.skip_bytes(1)?;
                     num_bits_togo -= 8;
                 } else {
                     return_bits = (return_bits << num_bits_togo)
-                        | (u32::from(self.current_byte()? >> (8 - num_bits_togo))
+                        | (usize::from(self.current_byte()? >> (8 - num_bits_togo))
                             & ((1 << num_bits_togo) - 1));
                     self.bit_offset += num_bits_togo as u8;
                     num_bits_togo = 0;
@@ -178,17 +213,17 @@ impl BitStream {
         Ok(return_bits)
     }
 
-    pub fn read_zero_term_string(&mut self) -> Result<String> {
+    pub fn read_zero_term_string(&mut self) -> String {
         let mut string = String::new();
         while !self.is_eof() {
-            let ch = self.read_byte()?;
+            let ch = self.read_byte().unwrap();
             if ch == 0 {
                 break;
             } else {
                 string.push(char::from(ch));
             }
         }
-        Ok(string)
+        string
     }
 }
 
@@ -196,88 +231,111 @@ impl BitStream {
 mod tests {
     use super::*;
 
-    fn new_stream() -> BitStream {
-        // 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
-        // 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
-        // 74 68 69 73 20 69 73 20 61 20 73 74 72 69 6E 67 00
-        let file = File::open("./test/test.binary").unwrap();
-        BitStream::new(file).unwrap()
+    #[test]
+    fn test_num_bytes_left() {
+        let mut stream = BitStream::new(vec![10, 11]);
+        assert_eq!(stream.num_bytes_left(), 2);
+        stream.byte_offset += 1;
+        assert_eq!(stream.num_bytes_left(), 1);
+        stream.byte_offset += 1;
+        assert_eq!(stream.num_bytes_left(), 0);
+    }
+
+    #[test]
+    fn test_has_bytes() {
+        let mut stream = BitStream::new(vec![10, 11]);
+        assert!(stream.has_bytes(2));
+        stream.byte_offset += 1;
+        assert!(stream.has_bytes(1));
+        stream.byte_offset += 1;
+        assert!(!stream.has_bytes(1));
     }
 
     #[test]
     fn test_read_byte() {
-        let mut stream = new_stream();
-        for i in 0..32 {
-            assert_eq!(stream.read_byte().unwrap(), i);
-            assert_eq!(stream.byte_offset, (i + 1) as u64);
-        }
-    }
-
-    #[test]
-    fn test_read_byte2() {
-        let mut stream = new_stream();
-        assert_eq!(stream.read_2bytes().unwrap(), Byte2(0, 1));
+        let mut stream = BitStream::new(vec![10, 11]);
+        assert_eq!(stream.byte_offset, 0);
+        assert_eq!(stream.read_byte().unwrap(), 10);
+        assert_eq!(stream.byte_offset, 1);
+        assert_eq!(stream.read_byte().unwrap(), 11);
         assert_eq!(stream.byte_offset, 2);
-        assert_eq!(stream.read_2bytes().unwrap(), Byte2(2, 3));
+        assert!(stream.read_byte().is_err());
     }
 
     #[test]
-    fn test_read_byte4() {
-        let mut stream = new_stream();
-        assert_eq!(stream.read_4bytes().unwrap(), Byte4(0, 1, 2, 3));
+    fn test_read_2bytes() {
+        let mut stream = BitStream::new(vec![10, 11, 12]);
+        assert_eq!(stream.byte_offset, 0);
+        assert_eq!(stream.read_2bytes().unwrap(), Byte2(10, 11));
+        assert_eq!(stream.byte_offset, 2);
+        assert!(stream.read_2bytes().is_err());
+    }
+
+    #[test]
+    fn test_read_4bytes() {
+        let mut stream = BitStream::new(vec![10, 11, 12, 13]);
+        assert_eq!(stream.byte_offset, 0);
+        assert_eq!(stream.read_4bytes().unwrap(), Byte4(10, 11, 12, 13));
         assert_eq!(stream.byte_offset, 4);
-        assert_eq!(stream.read_4bytes().unwrap(), Byte4(4, 5, 6, 7));
+        assert!(stream.read_4bytes().is_err());
     }
 
     #[test]
-    fn test_read_byte8() {
-        let mut stream = new_stream();
-        assert_eq!(stream.read_8bytes().unwrap(), Byte8(0, 1, 2, 3, 4, 5, 6, 7));
-        assert_eq!(stream.byte_offset, 8);
+    fn test_read_8bytes() {
+        let mut stream = BitStream::new(vec![10, 11, 12, 13, 14, 15, 16, 17]);
+        assert_eq!(stream.byte_offset, 0);
         assert_eq!(
             stream.read_8bytes().unwrap(),
-            Byte8(8, 9, 10, 11, 12, 13, 14, 15)
+            Byte8(10, 11, 12, 13, 14, 15, 16, 17)
         );
+        assert_eq!(stream.byte_offset, 8);
+        assert!(stream.read_8bytes().is_err());
     }
 
     #[test]
-    fn test_skip_bytes() {
-        let mut stream = new_stream();
-        assert_eq!(stream.skip_bytes(3).unwrap(), 3);
-        assert_eq!(stream.read_byte().unwrap(), 3);
-        assert_eq!(stream.byte_offset, 4);
-        stream.skip_bytes(45);
+    fn test_is_eof() {
+        let mut stream = BitStream::new(vec![10]);
+        assert!(!stream.is_eof());
+        stream.byte_offset += 1;
         assert!(stream.is_eof());
     }
 
     #[test]
+    fn test_skip_bytes() {
+        let mut stream = BitStream::new(vec![10, 11, 12]);
+        assert_eq!(stream.skip_bytes(2).unwrap(), 2);
+        assert!(stream.skip_bytes(1).is_err());
+    }
+
+    #[test]
     fn test_current_byte() {
-        let mut stream = new_stream();
-        assert_eq!(stream.current_byte().unwrap(), 0);
-        assert_eq!(stream.byte_offset, 0);
+        let mut stream = BitStream::new(vec![10]);
+        assert_eq!(stream.current_byte().unwrap(), 10);
+        stream.byte_offset += 1;
+        assert!(stream.current_byte().is_err());
     }
 
     #[test]
     fn test_read_bits() {
-        let mut stream = new_stream();
-        stream.skip_bytes(15); // 0F 00001111
-        assert_eq!(stream.byte_offset, 15);
+        let mut stream = BitStream::new(vec![15, 16, 17]); // 0F 00001111
         assert_eq!(stream.read_bits(5).unwrap(), 1); // 00001
         assert_eq!(stream.bit_offset, 5);
         assert_eq!(stream.read_bits(3).unwrap(), 7); // 111
         assert_eq!(stream.bit_offset, 0);
-        assert_eq!(stream.byte_offset, 16);
-        // 10 11  00010000 00010001
+        assert_eq!(stream.byte_offset, 1);
+        // A0 A1  00010000 00010001
         assert_eq!(stream.read_bits(3).unwrap(), 0); // 000
+        assert_eq!(stream.bit_offset, 3);
         assert_eq!(stream.read_bits(10).unwrap(), 514); // 10000 00010
         assert_eq!(stream.bit_offset, 5);
-        assert_eq!(stream.byte_offset, 17);
+        assert_eq!(stream.byte_offset, 2);
     }
 
     #[test]
     fn test_read_zero_term_string() {
-        let mut stream = new_stream();
-        stream.skip_bytes(32);
-        assert_eq!(stream.read_zero_term_string().unwrap(), "this is a string");
+        let mut stream = BitStream::new(vec![
+            's' as u8, 't' as u8, 'r' as u8, 'i' as u8, 'n' as u8, 'g' as u8, 0,
+        ]);
+        assert_eq!(stream.read_zero_term_string(), "string");
     }
 }
