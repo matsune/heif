@@ -7,7 +7,7 @@ pub struct Byte2(pub u8, pub u8);
 
 impl Byte2 {
     pub fn to_u16(&self) -> u16 {
-        (u16::from(self.0) << 4) + u16::from(self.1)
+        (u16::from(self.0) << 8) + u16::from(self.1)
     }
 
     pub fn to_u32(&self) -> u32 {
@@ -24,9 +24,9 @@ pub struct Byte4(pub u8, pub u8, pub u8, pub u8);
 
 impl Byte4 {
     pub fn to_u32(&self) -> u32 {
-        (u32::from(self.0) << 12)
-            + (u32::from(self.1) << 8)
-            + (u32::from(self.2) << 4)
+        (u32::from(self.0) << 24)
+            + (u32::from(self.1) << 16)
+            + (u32::from(self.2) << 8)
             + u32::from(self.3)
     }
 
@@ -61,13 +61,13 @@ pub struct Byte8(
 
 impl Byte8 {
     pub fn to_u64(&self) -> u64 {
-        (u64::from(self.0) << 28)
-            + (u64::from(self.1) << 24)
-            + (u64::from(self.2) << 20)
-            + (u64::from(self.3) << 16)
-            + (u64::from(self.4) << 12)
-            + (u64::from(self.5) << 8)
-            + (u64::from(self.6) << 4)
+        (u64::from(self.0) << 56)
+            + (u64::from(self.1) << 48)
+            + (u64::from(self.2) << 40)
+            + (u64::from(self.3) << 32)
+            + (u64::from(self.4) << 24)
+            + (u64::from(self.5) << 16)
+            + (u64::from(self.6) << 8)
             + u64::from(self.7)
     }
 }
@@ -283,9 +283,7 @@ impl BitStream {
         }
         let inner = &self.inner[self.byte_offset..(self.byte_offset + size)];
         self.byte_offset += size;
-        Ok(Extract::new(
-            inner,
-        ))
+        Ok(Extract::new(inner))
     }
 }
 

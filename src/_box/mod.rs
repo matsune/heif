@@ -128,4 +128,3 @@ impl Header for FullBoxHeader {
         s + 4
     }
 }
-

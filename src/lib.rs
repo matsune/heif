@@ -66,8 +66,8 @@ pub fn load(file_path: &str) -> Result<()> {
         //             let m_box = MetaBox::new(&mut stream, header)?;
         //             println!("meta {:?}", m_box);
         } else {
-            // TODO: skip_box();
-            panic!("unimplemented box type {}", header.box_type)
+            println!(">>SKIPPING {:?}", header);
+            stream.skip_bytes(header.body_size() as usize);
         }
     }
     Ok(())
