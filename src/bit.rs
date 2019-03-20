@@ -143,7 +143,7 @@ pub trait Stream {
 
     fn skip_bytes(&mut self, n: usize) -> Result<usize> {
         let left = self.num_bytes_left();
-        if n >= left {
+        if n > left {
             return Err(HeifError::EOF);
         }
         self.set_byte_offset(self.get_byte_offset() + n);
