@@ -1,6 +1,8 @@
-use crate::{HeifError, Result};
 use std::fs::File;
 use std::io::Read;
+
+use crate::_box::Header;
+use crate::{HeifError, Result};
 
 #[derive(Debug, PartialEq)]
 pub struct Byte2(pub u8, pub u8);
@@ -79,6 +81,7 @@ pub trait Stream {
     fn get_bit_offset(&self) -> u8;
     fn set_bit_offset(&mut self, n: u8);
     fn byte_at(&self, n: usize) -> u8;
+    fn extract(&mut self, size: usize) -> Result<Extract>;
 
     fn num_bytes_left(&self) -> usize {
         self.len() - self.get_byte_offset()
@@ -209,6 +212,10 @@ pub trait Stream {
         }
         string
     }
+
+    fn extract_from<H: Header>(&mut self, header: &H) -> Result<Extract> {
+        self.extract(header.body_size() as usize)
+    }
 }
 
 #[derive(Debug)]
@@ -252,6 +259,15 @@ impl<'a> Stream for Extract<'a> {
     fn byte_at(&self, n: usize) -> u8 {
         self.inner[n]
     }
+
+    fn extract(&mut self, size: usize) -> Result<Extract> {
+        if !self.has_bytes(size) {
+            return Err(HeifError::EOF);
+        }
+        let inner = &self.inner[self.byte_offset..(self.byte_offset + size)];
+        self.byte_offset += size;
+        Ok(Extract::new(inner))
+    }
 }
 
 #[derive(Debug)]
@@ -275,15 +291,6 @@ impl BitStream {
         file.read_to_end(&mut inner)
             .map_err(|_| HeifError::FileRead)?;
         Ok(BitStream::new(inner))
-    }
-
-    pub fn extract(&mut self, size: usize) -> Result<Extract> {
-        if !self.has_bytes(size) {
-            return Err(HeifError::EOF);
-        }
-        let inner = &self.inner[self.byte_offset..(self.byte_offset + size)];
-        self.byte_offset += size;
-        Ok(Extract::new(inner))
     }
 }
 
@@ -310,6 +317,15 @@ impl Stream for BitStream {
 
     fn byte_at(&self, n: usize) -> u8 {
         self.inner[n]
+    }
+
+    fn extract(&mut self, size: usize) -> Result<Extract> {
+        if !self.has_bytes(size) {
+            return Err(HeifError::EOF);
+        }
+        let inner = &self.inner[self.byte_offset..(self.byte_offset + size)];
+        self.byte_offset += size;
+        Ok(Extract::new(inner))
     }
 }
 
@@ -389,7 +405,7 @@ mod tests {
     #[test]
     fn test_skip_bytes() {
         let mut stream = BitStream::new(vec![10, 11, 12]);
-        assert_eq!(stream.skip_bytes(2).unwrap(), 2);
+        assert_eq!(stream.skip_bytes(3).unwrap(), 3);
         assert!(stream.skip_bytes(1).is_err());
     }
 

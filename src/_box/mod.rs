@@ -1,6 +1,6 @@
 pub mod ftyp;
-//pub mod meta;
-//
+pub mod meta;
+
 use crate::bit::*;
 use crate::Result;
 
@@ -22,7 +22,7 @@ pub struct BoxHeader {
 }
 
 impl BoxHeader {
-    pub fn new(stream: &mut BitStream) -> Result<BoxHeader> {
+    pub fn new<T: Stream>(stream: &mut T) -> Result<BoxHeader> {
         let mut box_size = stream.read_4bytes()?.to_u64();
         let box_type = stream.read_4bytes()?.to_string();
         let mut is_large = false;
@@ -97,7 +97,7 @@ pub struct FullBoxHeader {
 }
 
 impl FullBoxHeader {
-    pub fn new(stream: &mut BitStream, box_header: BoxHeader) -> Result<Self> {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let word = stream.read_4bytes()?;
         let version = word.0;
         let flags = (word.1, word.2, word.3);

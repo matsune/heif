@@ -1,6 +1,6 @@
-use crate::bbox::FullBoxHeader;
-use crate::bit::BitStream;
-use std::io::Result;
+use crate::_box::FullBoxHeader;
+use crate::bit::Stream;
+use crate::Result;
 
 #[derive(Debug)]
 pub struct HandlerBox {
@@ -10,13 +10,12 @@ pub struct HandlerBox {
 }
 
 impl HandlerBox {
-    pub fn new(stream: &mut BitStream, full_box_header: FullBoxHeader) -> Result<HandlerBox> {
+    pub fn new<T: Stream>(stream: &mut T, full_box_header: FullBoxHeader) -> Result<HandlerBox> {
         stream.skip_bytes(4)?;
         let handler_type = stream.read_4bytes()?.to_string();
         stream.skip_bytes(12)?;
-        let size = full_box_header.box_size() - u64::from(full_box_header.header_size());
         let mut name = Vec::new();
-        for _ in 0..(size - 20) {
+        while !stream.is_eof() {
             let c = stream.read_byte()?;
             if c == 0 {
                 break;

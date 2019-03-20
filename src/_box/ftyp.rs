@@ -1,4 +1,4 @@
-use crate::bit::{Extract, Stream};
+use crate::bit::Stream;
 use crate::BoxHeader;
 use crate::Result;
 
@@ -11,7 +11,7 @@ pub struct FileTypeBox {
 }
 
 impl FileTypeBox {
-    pub fn new(extract: &mut Extract, box_header: BoxHeader) -> Result<FileTypeBox> {
+    pub fn new<T: Stream>(extract: &mut T, box_header: BoxHeader) -> Result<FileTypeBox> {
         let major_brand = extract.read_4bytes()?.to_string();
         let minor_version = extract.read_4bytes()?.to_string();
         let mut compatibles = Vec::new();

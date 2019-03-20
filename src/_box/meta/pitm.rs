@@ -1,6 +1,6 @@
-use crate::bbox::FullBoxHeader;
-use crate::bit::BitStream;
-use std::io::Result;
+use crate::_box::FullBoxHeader;
+use crate::bit::Stream;
+use crate::Result;
 
 #[derive(Debug)]
 pub struct PrimaryItemBox {
@@ -9,7 +9,10 @@ pub struct PrimaryItemBox {
 }
 
 impl PrimaryItemBox {
-    pub fn new(stream: &mut BitStream, full_box_header: FullBoxHeader) -> Result<PrimaryItemBox> {
+    pub fn new<T: Stream>(
+        stream: &mut T,
+        full_box_header: FullBoxHeader,
+    ) -> Result<PrimaryItemBox> {
         let item_id = if full_box_header.version == 0 {
             stream.read_2bytes()?.to_u32()
         } else {
