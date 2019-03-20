@@ -1,13 +1,11 @@
-// mod bbox;
-mod _box;
+// mod _box;
 mod bit;
 
 use std::fs::File;
 
-// use crate::bbox::ftyp::FileTypeBox;
-// use crate::bbox::meta::*;
-// use crate::bbox::BoxHeader;
-use crate::bit::BitStream;
+use bit::BitStream;
+// use _box::BoxHeader;
+// use _box::ftyp::FileTypeBox;
 
 pub type Result<T> = std::result::Result<T, HeifError>;
 
@@ -47,16 +45,16 @@ pub fn load(file_path: &str) -> Result<()> {
     let mut ftyp_found = false;
     let mut meta_found = false;
 
-    //    while !stream.is_eof() {
-    //         let header = BoxHeader::new(&mut stream)?;
-    //         if header.box_type == "ftyp" {
-    //             if ftyp_found {
-    //                 // FIXME
-    //                 panic!("already has ftyp");
-    //             }
-    //             ftyp_found = true;
-    //             let ft_box = FileTypeBox::new(&mut stream, header)?;
-    //             println!("{:?}", ft_box);
+    // while !stream.is_eof() {
+    //     let header = BoxHeader::new(&mut stream)?;
+    //     if header.box_type == "ftyp" {
+    //         if ftyp_found {
+    //             // FIXME
+    //             panic!("already has ftyp");
+    //         }
+    //         ftyp_found = true;
+    //         let ft_box = FileTypeBox::new(&mut stream, header)?;
+    //         println!("{:?}", ft_box);
     //         } else if header.box_type == "meta" {
     //             if meta_found {
     //                 // FIXME
@@ -66,10 +64,10 @@ pub fn load(file_path: &str) -> Result<()> {
     //             meta_found = true;
     //             let m_box = MetaBox::new(&mut stream, header)?;
     //             println!("meta {:?}", m_box);
-    //         } else {
-    //             // TODO: skip_box();
-    //             panic!("unimplemented box type {}", header.box_type)
-    //         }
-    //     }
+    // } else {
+    //     // TODO: skip_box();
+    //     panic!("unimplemented box type {}", header.box_type)
+    // }
+    // }
     Ok(())
 }

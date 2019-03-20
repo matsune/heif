@@ -72,6 +72,188 @@ impl Byte8 {
     }
 }
 
+pub trait Stream {
+    fn len(&self) -> usize;
+    fn get_byte_offset(&self) -> usize;
+    fn set_byte_offset(&mut self, n: usize);
+    fn get_bit_offset(&self) -> u8;
+    fn set_bit_offset(&mut self, n: u8);
+    fn byte_at(&self, n: usize) -> u8;
+
+    fn num_bytes_left(&self) -> usize {
+        self.len() - self.get_byte_offset()
+    }
+
+    fn has_bytes(&self, n: usize) -> bool {
+        self.num_bytes_left() >= n
+    }
+
+    fn read_byte(&mut self) -> Result<u8> {
+        if !self.has_bytes(1) {
+            return Err(HeifError::EOF);
+        }
+        let byte = self.byte_at(self.get_byte_offset());
+        self.set_byte_offset(self.get_byte_offset() + 1);
+        Ok(byte)
+    }
+
+    fn read_2bytes(&mut self) -> Result<Byte2> {
+        if !self.has_bytes(2) {
+            return Err(HeifError::EOF);
+        }
+        let byte2 = Byte2(
+            self.byte_at(self.get_byte_offset()),
+            self.byte_at(self.get_byte_offset() + 1),
+        );
+        self.set_byte_offset(self.get_byte_offset() + 2);
+        Ok(byte2)
+    }
+
+    fn read_4bytes(&mut self) -> Result<Byte4> {
+        if !self.has_bytes(4) {
+            return Err(HeifError::EOF);
+        }
+        let byte4 = Byte4(
+            self.byte_at(self.get_byte_offset()),
+            self.byte_at(self.get_byte_offset() + 1),
+            self.byte_at(self.get_byte_offset() + 2),
+            self.byte_at(self.get_byte_offset() + 3),
+        );
+        self.set_byte_offset(self.get_byte_offset() + 4);
+        Ok(byte4)
+    }
+
+    fn read_8bytes(&mut self) -> Result<Byte8> {
+        if !self.has_bytes(8) {
+            return Err(HeifError::EOF);
+        }
+        let byte8 = Byte8(
+            self.byte_at(self.get_byte_offset()),
+            self.byte_at(self.get_byte_offset() + 1),
+            self.byte_at(self.get_byte_offset() + 2),
+            self.byte_at(self.get_byte_offset() + 3),
+            self.byte_at(self.get_byte_offset() + 4),
+            self.byte_at(self.get_byte_offset() + 5),
+            self.byte_at(self.get_byte_offset() + 6),
+            self.byte_at(self.get_byte_offset() + 7),
+        );
+        self.set_byte_offset(self.get_byte_offset() + 8);
+        Ok(byte8)
+    }
+
+    fn skip_bytes(&mut self, n: usize) -> Result<usize> {
+        let left = self.num_bytes_left();
+        if n >= left {
+            return Err(HeifError::EOF);
+        }
+        self.set_byte_offset(self.get_byte_offset() + n);
+        Ok(self.get_byte_offset())
+    }
+
+    fn is_eof(&self) -> bool {
+        self.get_byte_offset() >= self.len()
+    }
+
+    fn current_byte(&mut self) -> Result<u8> {
+        if self.is_eof() {
+            return Err(HeifError::EOF);
+        }
+        Ok(self.byte_at(self.get_byte_offset()))
+    }
+
+    fn read_bits(&mut self, n: usize) -> Result<usize> {
+        if n == 0 {
+            return Ok(0);
+        }
+        let mut return_bits = 0;
+        let num_bits_left_in_byte = usize::from(8 - self.get_bit_offset());
+        if num_bits_left_in_byte >= n {
+            return_bits =
+                usize::from(self.current_byte()? >> (num_bits_left_in_byte - n)) & ((1 << n) - 1);
+            self.set_bit_offset(self.get_bit_offset() + n as u8);
+        } else {
+            let mut num_bits_togo = n - num_bits_left_in_byte;
+            return_bits = usize::from(self.current_byte()?) & ((1 << num_bits_left_in_byte) - 1);
+            self.skip_bytes(1)?;
+            self.set_bit_offset(0);
+            while num_bits_togo > 0 {
+                if num_bits_togo > 8 {
+                    return_bits = (return_bits << 8) | usize::from(self.current_byte()?);
+                    self.skip_bytes(1)?;
+                    num_bits_togo -= 8;
+                } else {
+                    return_bits = (return_bits << num_bits_togo)
+                        | (usize::from(self.current_byte()? >> (8 - num_bits_togo))
+                            & ((1 << num_bits_togo) - 1));
+                    self.set_bit_offset(self.get_bit_offset() + num_bits_togo as u8);
+                    num_bits_togo = 0;
+                }
+            }
+        }
+        if self.get_bit_offset() == 8 {
+            self.skip_bytes(1)?;
+            self.set_bit_offset(0);
+        }
+        Ok(return_bits)
+    }
+
+    fn read_zero_term_string(&mut self) -> String {
+        let mut string = String::new();
+        while !self.is_eof() {
+            let ch = self.read_byte().unwrap();
+            if ch == 0 {
+                break;
+            } else {
+                string.push(char::from(ch));
+            }
+        }
+        string
+    }
+}
+
+#[derive(Debug)]
+pub struct Extract<'a> {
+    inner: &'a [u8],
+    bit_offset: u8,
+    byte_offset: usize,
+}
+
+impl<'a> Extract<'a> {
+    pub fn new(inner: &'a [u8]) -> Self {
+        Self {
+            inner,
+            bit_offset: 0,
+            byte_offset: 0,
+        }
+    }
+}
+
+impl<'a> Stream for Extract<'a> {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    fn get_byte_offset(&self) -> usize {
+        self.byte_offset
+    }
+
+    fn set_byte_offset(&mut self, n: usize) {
+        self.byte_offset = n
+    }
+
+    fn get_bit_offset(&self) -> u8 {
+        self.bit_offset
+    }
+
+    fn set_bit_offset(&mut self, n: u8) {
+        self.bit_offset = n;
+    }
+
+    fn byte_at(&self, n: usize) -> u8 {
+        self.inner[n]
+    }
+}
+
 #[derive(Debug)]
 pub struct BitStream {
     inner: Vec<u8>,
@@ -95,135 +277,39 @@ impl BitStream {
         Ok(BitStream::new(inner))
     }
 
-    pub fn num_bytes_left(&self) -> usize {
-        self.inner.len() - self.byte_offset
-    }
-
-    pub fn has_bytes(&self, n: usize) -> bool {
-        self.num_bytes_left() >= n
-    }
-
-    pub fn read_byte(&mut self) -> Result<u8> {
-        if !self.has_bytes(1) {
+    pub fn extract(&self, size: usize) -> Result<Extract> {
+        if !self.has_bytes(size) {
             return Err(HeifError::EOF);
         }
-        let byte = self.inner[self.byte_offset];
-        self.byte_offset += 1;
-        Ok(byte)
+        Ok(Extract::new(
+            &self.inner[self.byte_offset..(self.byte_offset + size)],
+        ))
+    }
+}
+
+impl Stream for BitStream {
+    fn len(&self) -> usize {
+        self.inner.len()
     }
 
-    pub fn read_2bytes(&mut self) -> Result<Byte2> {
-        if !self.has_bytes(2) {
-            return Err(HeifError::EOF);
-        }
-        let byte2 = Byte2(
-            self.inner[self.byte_offset],
-            self.inner[self.byte_offset + 1],
-        );
-        self.byte_offset += 2;
-        Ok(byte2)
+    fn get_byte_offset(&self) -> usize {
+        self.byte_offset
     }
 
-    pub fn read_4bytes(&mut self) -> Result<Byte4> {
-        if !self.has_bytes(4) {
-            return Err(HeifError::EOF);
-        }
-        let byte4 = Byte4(
-            self.inner[self.byte_offset],
-            self.inner[self.byte_offset + 1],
-            self.inner[self.byte_offset + 2],
-            self.inner[self.byte_offset + 3],
-        );
-        self.byte_offset += 4;
-        Ok(byte4)
+    fn set_byte_offset(&mut self, n: usize) {
+        self.byte_offset = n
     }
 
-    pub fn read_8bytes(&mut self) -> Result<Byte8> {
-        if !self.has_bytes(8) {
-            return Err(HeifError::EOF);
-        }
-        let byte8 = Byte8(
-            self.inner[self.byte_offset],
-            self.inner[self.byte_offset + 1],
-            self.inner[self.byte_offset + 2],
-            self.inner[self.byte_offset + 3],
-            self.inner[self.byte_offset + 4],
-            self.inner[self.byte_offset + 5],
-            self.inner[self.byte_offset + 6],
-            self.inner[self.byte_offset + 7],
-        );
-        self.byte_offset += 8;
-        Ok(byte8)
+    fn get_bit_offset(&self) -> u8 {
+        self.bit_offset
     }
 
-    pub fn skip_bytes(&mut self, n: usize) -> Result<usize> {
-        let left = self.num_bytes_left();
-        if n >= left {
-            return Err(HeifError::EOF);
-        }
-        self.byte_offset += n;
-        Ok(self.byte_offset)
+    fn set_bit_offset(&mut self, n: u8) {
+        self.bit_offset = n;
     }
 
-    pub fn is_eof(&self) -> bool {
-        self.byte_offset >= self.inner.len()
-    }
-
-    // read byte without seeking
-    pub fn current_byte(&mut self) -> Result<u8> {
-        if self.is_eof() {
-            return Err(HeifError::EOF);
-        }
-        Ok(self.inner[self.byte_offset])
-    }
-
-    pub fn read_bits(&mut self, n: usize) -> Result<usize> {
-        if n == 0 {
-            return Ok(0);
-        }
-        let mut return_bits = 0;
-        let num_bits_left_in_byte = usize::from(8 - self.bit_offset);
-        if num_bits_left_in_byte >= n {
-            return_bits =
-                usize::from(self.current_byte()? >> (num_bits_left_in_byte - n)) & ((1 << n) - 1);
-            self.bit_offset += n as u8;
-        } else {
-            let mut num_bits_togo = n - num_bits_left_in_byte;
-            return_bits = usize::from(self.current_byte()?) & ((1 << num_bits_left_in_byte) - 1);
-            self.skip_bytes(1)?;
-            self.bit_offset = 0;
-            while num_bits_togo > 0 {
-                if num_bits_togo > 8 {
-                    return_bits = (return_bits << 8) | usize::from(self.current_byte()?);
-                    self.skip_bytes(1)?;
-                    num_bits_togo -= 8;
-                } else {
-                    return_bits = (return_bits << num_bits_togo)
-                        | (usize::from(self.current_byte()? >> (8 - num_bits_togo))
-                            & ((1 << num_bits_togo) - 1));
-                    self.bit_offset += num_bits_togo as u8;
-                    num_bits_togo = 0;
-                }
-            }
-        }
-        if self.bit_offset == 8 {
-            self.skip_bytes(1)?;
-            self.bit_offset = 0;
-        }
-        Ok(return_bits)
-    }
-
-    pub fn read_zero_term_string(&mut self) -> String {
-        let mut string = String::new();
-        while !self.is_eof() {
-            let ch = self.read_byte().unwrap();
-            if ch == 0 {
-                break;
-            } else {
-                string.push(char::from(ch));
-            }
-        }
-        string
+    fn byte_at(&self, n: usize) -> u8 {
+        self.inner[n]
     }
 }
 
@@ -337,5 +423,16 @@ mod tests {
             's' as u8, 't' as u8, 'r' as u8, 'i' as u8, 'n' as u8, 'g' as u8, 0,
         ]);
         assert_eq!(stream.read_zero_term_string(), "string");
+    }
+
+    #[test]
+    fn test_extract() {
+        let mut stream = BitStream::new(vec![0, 1, 2, 3, 4]);
+        let ex = stream.extract(3).unwrap();
+        assert_eq!(ex.inner, [0, 1, 2]);
+        let ex = stream.extract(5).unwrap();
+        assert_eq!(ex.inner, [0, 1, 2, 3, 4]);
+        let ex = stream.extract(6);
+        assert!(ex.is_err());
     }
 }

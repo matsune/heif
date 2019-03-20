@@ -96,12 +96,11 @@ impl FullBoxHeader {
         })
     }
 
-//    pub fn header_size(&self) -> u8 {
-//        self.box_header.header_size() + 4
-//    }
-//
-//    pub fn box_size(&self) -> u64 {
-//        self.box_header.box_size
-//    }
+    //    pub fn header_size(&self) -> u8 {
+    //        self.box_header.header_size() + 4
+    //    }
+    //
+    //    pub fn box_size(&self) -> u64 {
+    //        self.box_header.box_size
+    //    }
 }
-
