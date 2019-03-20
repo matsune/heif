@@ -1,6 +1,6 @@
 use crate::{HeifError, Result};
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::Read;
 
 #[derive(Debug, PartialEq)]
 pub struct Byte2(pub u8, pub u8);
@@ -277,12 +277,14 @@ impl BitStream {
         Ok(BitStream::new(inner))
     }
 
-    pub fn extract(&self, size: usize) -> Result<Extract> {
+    pub fn extract(&mut self, size: usize) -> Result<Extract> {
         if !self.has_bytes(size) {
             return Err(HeifError::EOF);
         }
+        let inner = &self.inner[self.byte_offset..(self.byte_offset + size)];
+        self.byte_offset += size;
         Ok(Extract::new(
-            &self.inner[self.byte_offset..(self.byte_offset + size)],
+            inner,
         ))
     }
 }

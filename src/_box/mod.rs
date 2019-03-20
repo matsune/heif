@@ -4,6 +4,15 @@ pub mod ftyp;
 use crate::bit::*;
 use crate::Result;
 
+pub trait Header {
+    fn get_box_size(&self) -> u64;
+    fn header_size(&self) -> u8;
+
+    fn body_size(&self) -> u64 {
+        self.get_box_size() - u64::from(self.header_size())
+    }
+}
+
 #[derive(Debug)]
 pub struct BoxHeader {
     pub box_size: u64,
@@ -13,17 +22,6 @@ pub struct BoxHeader {
 }
 
 impl BoxHeader {
-    //  pub fn header_size(&self) -> u8 {
-    //      let mut s = 8u8;
-    //      if self.box_size == 1 {
-    //          s += 8
-    //      }
-    //      if self.box_type == "uuid" {
-    //          s += 16
-    //      }
-    //      s
-    //  }
-
     pub fn new(stream: &mut BitStream) -> Result<BoxHeader> {
         let mut box_size = stream.read_4bytes()?.to_u64();
         let box_type = stream.read_4bytes()?.to_string();
@@ -44,6 +42,23 @@ impl BoxHeader {
             is_large,
             user_type,
         })
+    }
+}
+
+impl Header for BoxHeader {
+    fn get_box_size(&self) -> u64 {
+        self.box_size
+    }
+
+    fn header_size(&self) -> u8 {
+        let mut s = 8u8;
+        if self.is_large {
+            s += 8
+        }
+        if self.box_type == "uuid" {
+            s += 16
+        }
+        s
     }
 }
 
@@ -95,12 +110,22 @@ impl FullBoxHeader {
             flags,
         })
     }
-
-    //    pub fn header_size(&self) -> u8 {
-    //        self.box_header.header_size() + 4
-    //    }
-    //
-    //    pub fn box_size(&self) -> u64 {
-    //        self.box_header.box_size
-    //    }
 }
+
+impl Header for FullBoxHeader {
+    fn get_box_size(&self) -> u64 {
+        self.box_size
+    }
+
+    fn header_size(&self) -> u8 {
+        let mut s = 8u8;
+        if self.is_large {
+            s += 8
+        }
+        if self.box_type == "uuid" {
+            s += 16
+        }
+        s + 4
+    }
+}
+
