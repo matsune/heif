@@ -145,7 +145,6 @@ pub trait Stream {
         Ok(byte8)
     }
 
-
     fn skip_bytes(&mut self, n: usize) -> Result<usize> {
         let left = self.num_bytes_left();
         if n > left {

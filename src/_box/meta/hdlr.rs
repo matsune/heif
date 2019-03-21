@@ -1,4 +1,4 @@
-use crate::_box::FullBoxHeader;
+use crate::_box::{BoxHeader, FullBoxHeader};
 use crate::bit::Stream;
 use crate::Result;
 
@@ -10,7 +10,8 @@ pub struct HandlerBox {
 }
 
 impl HandlerBox {
-    pub fn new<T: Stream>(stream: &mut T, full_box_header: FullBoxHeader) -> Result<HandlerBox> {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<HandlerBox> {
+        let full_box_header = FullBoxHeader::new(stream, box_header)?;
         stream.skip_bytes(4)?;
         let handler_type = stream.read_4bytes()?.to_string();
         stream.skip_bytes(12)?;

@@ -1,4 +1,4 @@
-use crate::_box::FullBoxHeader;
+use crate::_box::{BoxHeader, FullBoxHeader};
 use crate::bit::Stream;
 use crate::Result;
 
@@ -9,10 +9,8 @@ pub struct PrimaryItemBox {
 }
 
 impl PrimaryItemBox {
-    pub fn new<T: Stream>(
-        stream: &mut T,
-        full_box_header: FullBoxHeader,
-    ) -> Result<PrimaryItemBox> {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<PrimaryItemBox> {
+        let full_box_header = FullBoxHeader::new(stream, box_header)?;
         let item_id = if full_box_header.version == 0 {
             stream.read_2bytes()?.to_u32()
         } else {

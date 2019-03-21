@@ -1,6 +1,5 @@
-use crate::_box::{BoxHeader, FullBoxHeader};
+use crate::_box::BoxHeader;
 use crate::bit::Stream;
-use crate::error::HeifError;
 use crate::Result;
 
 #[derive(Debug)]

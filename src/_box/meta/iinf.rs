@@ -33,7 +33,8 @@ pub struct ItemInfoExtension {
 }
 
 impl ItemInfoBox {
-    pub fn new<T: Stream>(stream: &mut T, full_box_header: FullBoxHeader) -> Result<ItemInfoBox> {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<ItemInfoBox> {
+        let full_box_header = FullBoxHeader::new(stream, box_header)?;
         let entry_count = if full_box_header.version == 0 {
             stream.read_2bytes()?.to_u32()
         } else {
@@ -42,8 +43,7 @@ impl ItemInfoBox {
         let mut item_info_list = Vec::new();
         for _ in 0..entry_count {
             let entry_box_header = BoxHeader::new(stream)?;
-            let entry_fullbox_header = FullBoxHeader::new(stream, entry_box_header)?;
-            item_info_list.push(ItemInfoEntry::new(stream, entry_fullbox_header)?);
+            item_info_list.push(ItemInfoEntry::new(stream, entry_box_header)?);
         }
         Ok(ItemInfoBox {
             full_box_header,
@@ -53,7 +53,8 @@ impl ItemInfoBox {
 }
 
 impl ItemInfoEntry {
-    pub fn new<T: Stream>(stream: &mut T, full_box_header: FullBoxHeader) -> Result<Self> {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::new(stream, box_header)?;
         let mut item_id = 0u32;
         let mut item_protection_index = 0u16;
         let mut item_name = String::new();

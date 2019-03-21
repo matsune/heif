@@ -9,7 +9,8 @@ pub struct ItemReferenceBox {
 }
 
 impl ItemReferenceBox {
-    pub fn new<T: Stream>(stream: &mut T, full_box_header: FullBoxHeader) -> Result<Self> {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::new(stream, box_header)?;
         let is_large = full_box_header.version > 0;
         let mut reference_list = Vec::new();
         while !stream.is_eof() {
