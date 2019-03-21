@@ -1,7 +1,7 @@
 pub mod ftyp;
 pub mod meta;
 
-use crate::bit::*;
+use crate::bit::Stream;
 use crate::Result;
 
 pub trait Header {
@@ -65,6 +65,7 @@ impl Header for BoxHeader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bit::BitStream;
 
     #[test]
     fn test_box_header_new() {

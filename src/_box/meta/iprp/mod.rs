@@ -5,7 +5,8 @@ use std::collections::HashMap;
 
 use crate::_box::{BoxHeader, FullBoxHeader};
 use crate::bit::Stream;
-use crate::{HeifError, Result};
+use crate::error::HeifError;
+use crate::Result;
 use hevc::HevcConfigurationBox;
 use ispe::ImageSpatialExtentsProperty;
 

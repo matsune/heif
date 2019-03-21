@@ -1,6 +1,6 @@
-use crate::bit::Stream;
-use crate::BoxHeader;
 use crate::Result;
+use crate::_box::BoxHeader;
+use crate::bit::Stream;
 
 #[derive(Debug)]
 pub struct FileTypeBox {

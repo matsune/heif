@@ -1,8 +1,9 @@
 use std::fs::File;
 use std::io::Read;
 
+use crate::Result;
 use crate::_box::Header;
-use crate::{HeifError, Result};
+use crate::error::HeifError;
 
 #[derive(Debug, PartialEq)]
 pub struct Byte2(pub u8, pub u8);
@@ -446,9 +447,7 @@ mod tests {
         let mut stream = BitStream::new(vec![0, 1, 2, 3, 4]);
         let ex = stream.extract(3).unwrap();
         assert_eq!(ex.inner, [0, 1, 2]);
-        let ex = stream.extract(5).unwrap();
-        assert_eq!(ex.inner, [0, 1, 2, 3, 4]);
-        let ex = stream.extract(6);
+        let ex = stream.extract(3);
         assert!(ex.is_err());
     }
 }
