@@ -1,12 +1,12 @@
-use crate::bbox::FullBoxHeader;
-use crate::bit::BitStream;
-use std::io::Result;
+use crate::_box::FullBoxHeader;
+use crate::bit::Stream;
+use crate::Result;
 
 #[derive(Debug)]
 struct ItemLocationExtent {
-    extent_index: u64,
-    extent_offset: u64,
-    extent_length: u64,
+    extent_index: usize,
+    extent_offset: usize,
+    extent_length: usize,
 }
 
 impl ItemLocationExtent {
@@ -31,7 +31,7 @@ pub struct ItemLocation {
     item_id: u32,
     method: ConstructionMethod,
     data_ref_index: u16,
-    base_offset: u64,
+    base_offset: usize,
     extent_list: Vec<ItemLocationExtent>,
 }
 
@@ -58,7 +58,10 @@ pub struct ItemLocationBox {
 }
 
 impl ItemLocationBox {
-    pub fn new(stream: &mut BitStream, full_box_header: FullBoxHeader) -> Result<ItemLocationBox> {
+    pub fn new<T: Stream>(
+        stream: &mut T,
+        full_box_header: FullBoxHeader,
+    ) -> Result<ItemLocationBox> {
         let offset_size = stream.read_bits(4)? as u8;
         let length_size = stream.read_bits(4)? as u8;
         let base_offset_size = stream.read_bits(4)? as u8;
@@ -97,16 +100,16 @@ impl ItemLocationBox {
                 };
             }
             item_loc.data_ref_index = stream.read_2bytes()?.to_u16();
-            item_loc.base_offset = u64::from(stream.read_bits(u32::from(base_offset_size * 8))?);
+            item_loc.base_offset = stream.read_bits(usize::from(base_offset_size) * 8)?;
             let extent_count = stream.read_2bytes()?.to_u16();
             for _ in 0..extent_count {
                 let mut loc_ext = ItemLocationExtent::new();
                 if (full_box_header.version == 1 || full_box_header.version == 2) && index_size > 0
                 {
-                    loc_ext.extent_index = u64::from(stream.read_bits(u32::from(index_size * 8))?);
+                    loc_ext.extent_index = stream.read_bits(usize::from(index_size) * 8)?;
                 }
-                loc_ext.extent_offset = u64::from(stream.read_bits(u32::from(offset_size * 8))?);
-                loc_ext.extent_length = u64::from(stream.read_bits(u32::from(length_size * 8))?);
+                loc_ext.extent_offset = stream.read_bits(usize::from(offset_size * 8))?;
+                loc_ext.extent_length = stream.read_bits(usize::from(length_size * 8))?;
                 item_loc.extent_list.push(loc_ext);
             }
             locations.push(item_loc);

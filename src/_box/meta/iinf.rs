@@ -1,6 +1,6 @@
-use crate::bbox::{BoxHeader, FullBoxHeader};
-use crate::bit::BitStream;
-use std::io::Result;
+use crate::_box::{BoxHeader, FullBoxHeader};
+use crate::bit::Stream;
+use crate::Result;
 
 #[derive(Debug)]
 pub struct ItemInfoBox {
@@ -33,7 +33,7 @@ pub struct ItemInfoExtension {
 }
 
 impl ItemInfoBox {
-    pub fn new(stream: &mut BitStream, full_box_header: FullBoxHeader) -> Result<ItemInfoBox> {
+    pub fn new<T: Stream>(stream: &mut T, full_box_header: FullBoxHeader) -> Result<ItemInfoBox> {
         let entry_count = if full_box_header.version == 0 {
             stream.read_2bytes()?.to_u32()
         } else {
@@ -53,7 +53,7 @@ impl ItemInfoBox {
 }
 
 impl ItemInfoEntry {
-    pub fn new(stream: &mut BitStream, full_box_header: FullBoxHeader) -> Result<Self> {
+    pub fn new<T: Stream>(stream: &mut T, full_box_header: FullBoxHeader) -> Result<Self> {
         let mut item_id = 0u32;
         let mut item_protection_index = 0u16;
         let mut item_name = String::new();
@@ -86,14 +86,14 @@ impl ItemInfoEntry {
             };
             item_protection_index = stream.read_2bytes()?.to_u16();
             item_type = stream.read_4bytes()?.to_string();
-            item_name = stream.read_zero_term_string()?;
+            item_name = stream.read_zero_term_string();
             if item_type == "mime" {
-                content_type = stream.read_zero_term_string()?;
+                content_type = stream.read_zero_term_string();
                 if stream.num_bytes_left() > 0 {
-                    content_encoding = stream.read_zero_term_string()?;
+                    content_encoding = stream.read_zero_term_string();
                 }
             } else if item_type == "uri " {
-                item_uri_type = stream.read_zero_term_string()?;
+                item_uri_type = stream.read_zero_term_string();
             }
         }
         Ok(ItemInfoEntry {
@@ -123,9 +123,9 @@ impl ItemInfoExtension {
         }
     }
 
-    fn new(stream: &mut BitStream) -> Result<Self> {
-        let content_location = stream.read_zero_term_string()?;
-        let content_md5 = stream.read_zero_term_string()?;
+    fn new<T: Stream>(stream: &mut T) -> Result<Self> {
+        let content_location = stream.read_zero_term_string();
+        let content_md5 = stream.read_zero_term_string();
         let content_length = stream.read_8bytes()?.to_u64();
         let transfer_length = stream.read_8bytes()?.to_u64();
         let entry_count = stream.read_byte()?;

@@ -1,22 +1,23 @@
-use crate::bbox::BoxHeader;
-use crate::bit::BitStream;
-use std::io::Result;
+use crate::_box::BoxHeader;
+use crate::bit::Stream;
+use crate::{HeifError, Result};
 
 #[derive(Debug)]
 pub struct ItemPropertiesBox {
     pub box_header: BoxHeader,
     pub container: ItemPropertyContainer,
+    //   pub association_boxes: Vec<ItemPropertyAssociation>,
 }
 
 impl ItemPropertiesBox {
-    pub fn new(stream: &mut BitStream, box_header: BoxHeader) -> Result<Self> {
-        let mut left = box_header.box_size - u64::from(box_header.header_size());
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let container_box_header = BoxHeader::new(stream)?;
-        let container = ItemPropertyContainer::new(stream, container_box_header)?;
-        while left > 0 {
+        let mut ex = stream.extract_from(&container_box_header)?;
+        let container = ItemPropertyContainer::new(&mut ex, container_box_header)?;
+        while !stream.is_eof() {
             let sub_box_header = BoxHeader::new(stream)?;
             if sub_box_header.box_type != "ipma" {
-                panic!("ipma")
+                return Err(HeifError::InvalidFormat);
             }
             unimplemented!("ItemPropertiesBox")
         }
@@ -29,6 +30,42 @@ impl ItemPropertiesBox {
 
 trait ItemProperty {}
 
+pub struct ItemPropertyContainer {
+    pub box_header: BoxHeader,
+    pub properties: Vec<Box<ItemProperty>>,
+}
+
+impl ItemPropertyContainer {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        if box_header.box_type != "ipco" {
+            // TODO: ?
+        }
+        let mut properties: Vec<Box<ItemProperty>> = Vec::new();
+        while !stream.is_eof() {
+            let sub_box_header = BoxHeader::new(stream)?;
+            let mut ex = stream.extract_from(&sub_box_header)?;
+            let property = if sub_box_header.box_type == "hvcC" {
+                HevcConfigurationBox::new(&mut ex, sub_box_header)?
+            // } else if sub_box_header.box_type == "ispe" {
+            //     ImageSpatialExtentsProperty::new(&mut ex, sub_box_header)?
+            } else {
+                unimplemented!("itemprop {}", sub_box_header.box_type)
+            };
+            properties.push(Box::new(property));
+        }
+        Ok(Self {
+            box_header,
+            properties,
+        })
+    }
+}
+
+impl std::fmt::Debug for ItemPropertyContainer {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "ItemPropertyContainer {:?}", self.box_header)
+    }
+}
+
 #[derive(Debug)]
 pub struct HevcConfigurationBox {
     pub box_header: BoxHeader,
@@ -36,7 +73,7 @@ pub struct HevcConfigurationBox {
 }
 
 impl HevcConfigurationBox {
-    fn new(stream: &mut BitStream, box_header: BoxHeader) -> Result<Self> {
+    fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         Ok(Self {
             box_header,
             hevc_config: HevcDecoderConfigurationRecord::new(stream)?,
@@ -71,11 +108,11 @@ pub struct HevcDecoderConfigurationRecord {
     num_temporal_layers: u8,
     temporal_id_nested: u8,
     length_size_minus1: u8,
-    nal_array: Vec<HevcNALArray>,
+    nal_array: Vec<NalArray>,
 }
 
 impl HevcDecoderConfigurationRecord {
-    fn new(stream: &mut BitStream) -> Result<Self> {
+    fn new<T: Stream>(stream: &mut T) -> Result<Self> {
         let configuration_version = stream.read_byte()?;
         let general_profile_space = stream.read_bits(2)? as u8;
         let general_tier_flag = stream.read_bits(1)? as u8;
@@ -101,7 +138,6 @@ impl HevcDecoderConfigurationRecord {
         let num_temporal_layers = stream.read_bits(3)? as u8;
         let temporal_id_nested = stream.read_bits(1)? as u8;
         let length_size_minus1 = stream.read_bits(2)? as u8;
-
         let mut res = Self {
             configuration_version,
             general_profile_space,
@@ -140,26 +176,54 @@ impl HevcDecoderConfigurationRecord {
                 for _ in 0..nal_size {
                     nal_data.push(stream.read_byte()?);
                 }
-                res.add_nal_unit(&nal_unit_type, array_completeness);
+                res.add_nal_unit(nal_data, nal_unit_type, array_completeness);
             }
         }
         Ok(res)
     }
 
-    fn add_nal_unit(&mut self, nal_unit_type: &NalUnitType, array_completeness: bool) {
-        let nal_array = self.nal_array.iter().find(|nal| nal.nal_unit_type == *nal_unit_type);
-        if nal_array.is_none() {
-            nal_array = Some(HevcNALArray{
-                array_completeness,
-                nal_unit_type,
-            });
-            self.nal_array.push(nal_array.unwrap());
-        }
-        panic!("")
+    fn add_nal_unit(
+        &mut self,
+        nal_unit: Vec<u8>,
+        nal_unit_type: NalUnitType,
+        array_completeness: bool,
+    ) {
+        let start_code_len = find_start_code_len(&nal_unit);
+        let v = nal_unit[start_code_len..].to_vec();
+        match self
+            .nal_array
+            .iter_mut()
+            .find(|unit| unit.nal_unit_type == nal_unit_type)
+        {
+            Some(n) => {
+                n.nal_list.push(v);
+            }
+            None => {
+                let tmp = NalArray {
+                    array_completeness,
+                    nal_unit_type: nal_unit_type,
+                    nal_list: vec![v],
+                };
+                self.nal_array.push(tmp);
+            }
+        };
     }
 }
 
-#[derive(Debug,PartialEq)]
+fn find_start_code_len(data: &Vec<u8>) -> usize {
+    let mut i = 0;
+    let size = data.len();
+    while (i + 1) < size && data[i] == 0 {
+        i += 1;
+    }
+    if i > 1 && data[i] == 1 {
+        i + 1
+    } else {
+        0
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
 enum NalUnitType {
     CodedSliceTrailN, // 0
     CodedSliceTrailR, // 1
@@ -310,43 +374,8 @@ impl NalUnitType {
 }
 
 #[derive(Debug)]
-struct HevcNALArray {
+struct NalArray {
     array_completeness: bool,
     nal_unit_type: NalUnitType,
     nal_list: Vec<Vec<u8>>,
-}
-
-pub struct ItemPropertyContainer {
-    pub box_header: BoxHeader,
-    pub properties: Vec<Box<ItemProperty>>,
-}
-
-impl ItemPropertyContainer {
-    pub fn new(stream: &mut BitStream, box_header: BoxHeader) -> Result<Self> {
-        if box_header.box_type != "ipco" {
-            panic!("ipco");
-        }
-        let mut left = box_header.box_size - u64::from(box_header.header_size());
-        let mut properties: Vec<Box<ItemProperty>> = Vec::new();
-        while left > 0 {
-            let sub_box_header = BoxHeader::new(stream)?;
-            let property = if sub_box_header.box_type == "hvcC" {
-                HevcConfigurationBox::new(stream, sub_box_header)?
-            } else {
-                unimplemented!("itemprop {}", sub_box_header.box_type)
-            };
-            left -= property.box_header.box_size;
-            properties.push(Box::new(property));
-        }
-        Ok(Self {
-            box_header,
-            properties,
-        })
-    }
-}
-
-impl std::fmt::Debug for ItemPropertyContainer {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "ItemPropertyContainer {:?}", self.box_header)
-    }
 }

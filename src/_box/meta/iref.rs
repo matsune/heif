@@ -1,6 +1,6 @@
-use crate::bbox::{BoxHeader, FullBoxHeader};
-use crate::bit::BitStream;
-use std::io::Result;
+use crate::_box::{BoxHeader, FullBoxHeader};
+use crate::bit::Stream;
+use crate::Result;
 
 #[derive(Debug)]
 pub struct ItemReferenceBox {
@@ -9,13 +9,11 @@ pub struct ItemReferenceBox {
 }
 
 impl ItemReferenceBox {
-    pub fn new(stream: &mut BitStream, full_box_header: FullBoxHeader) -> Result<Self> {
+    pub fn new<T: Stream>(stream: &mut T, full_box_header: FullBoxHeader) -> Result<Self> {
         let is_large = full_box_header.version > 0;
         let mut reference_list = Vec::new();
-        let mut left = full_box_header.box_size() - u64::from(full_box_header.header_size());
-        while left > 0 {
+        while !stream.is_eof() {
             let box_header = BoxHeader::new(stream)?;
-            left -= box_header.box_size;
             reference_list.push(SingleItemTypeReferenceBox::new(
                 stream, box_header, is_large,
             )?);
@@ -36,7 +34,7 @@ pub struct SingleItemTypeReferenceBox {
 }
 
 impl SingleItemTypeReferenceBox {
-    pub fn new(stream: &mut BitStream, box_header: BoxHeader, is_large: bool) -> Result<Self> {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader, is_large: bool) -> Result<Self> {
         let from_item_id = if is_large {
             stream.read_4bytes()?.to_u32()
         } else {
