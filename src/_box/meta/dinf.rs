@@ -32,7 +32,7 @@ impl DataInformationBox {
 
 pub struct DataReferenceBox {
     full_box_header: FullBoxHeader,
-    data_entries: Vec<Box<DataEntryBox>>,
+    data_entries: Vec<Box<DataEntry>>,
 }
 
 impl DataReferenceBox {
@@ -43,7 +43,7 @@ impl DataReferenceBox {
         for _ in 0..entry_count {
             let child_box_header = BoxHeader::new(stream)?;
             let mut ex = stream.extract_from(&child_box_header)?;
-            let data_entry: Box<DataEntryBox> = match child_box_header.box_type.as_str() {
+            let data_entry: Box<DataEntry> = match child_box_header.box_type.as_str() {
                 "urn " => Box::new(DataEntryUrnBox::new(&mut ex, child_box_header)?),
                 "url " => Box::new(DataEntryUrlBox::new(&mut ex, child_box_header)?),
                 _ => return Err(HeifError::InvalidFormat),
@@ -57,7 +57,15 @@ impl DataReferenceBox {
     }
 }
 
-pub trait DataEntryBox {}
+pub trait DataEntry {}
+
+#[derive(Debug)]
+pub struct DataEntryBox {
+    full_box_header: FullBoxHeader,
+    location: String,
+}
+
+impl DataEntry for DataEntryBox {}
 
 pub struct DataEntryUrnBox {
     full_box_header: FullBoxHeader,
@@ -76,7 +84,8 @@ impl DataEntryUrnBox {
         })
     }
 }
-impl DataEntryBox for DataEntryUrnBox {}
+
+impl DataEntry for DataEntryUrnBox {}
 
 pub struct DataEntryUrlBox {
     full_box_header: FullBoxHeader,
@@ -97,4 +106,4 @@ impl DataEntryUrlBox {
     }
 }
 
-impl DataEntryBox for DataEntryUrlBox {}
+impl DataEntry for DataEntryUrlBox {}

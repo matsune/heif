@@ -1,5 +1,6 @@
 pub mod ftyp;
 pub mod meta;
+pub mod moov;
 
 use crate::bit::Stream;
 use crate::Result;
