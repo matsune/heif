@@ -93,14 +93,14 @@ pub struct FullBoxHeader {
     pub user_type: Vec<u8>,
     pub is_large: bool,
     pub version: u8,
-    pub flags: (u8, u8, u8),
+    pub flags: u32,
 }
 
 impl FullBoxHeader {
     pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let word = stream.read_4bytes()?;
         let version = word.0;
-        let flags = (word.1, word.2, word.3);
+        let flags = u32::from(word.1) << 16 + u32::from(word.2) << 8 + u32::from(word.3);
         Ok(Self {
             box_size: box_header.box_size,
             box_type: box_header.box_type,

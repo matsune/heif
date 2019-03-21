@@ -1,70 +1,7 @@
+use crate::_box::meta::iprp::ItemProperty;
 use crate::_box::BoxHeader;
 use crate::bit::Stream;
-use crate::{HeifError, Result};
-
-#[derive(Debug)]
-pub struct ItemPropertiesBox {
-    pub box_header: BoxHeader,
-    pub container: ItemPropertyContainer,
-    //   pub association_boxes: Vec<ItemPropertyAssociation>,
-}
-
-impl ItemPropertiesBox {
-    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let container_box_header = BoxHeader::new(stream)?;
-        let mut ex = stream.extract_from(&container_box_header)?;
-        let container = ItemPropertyContainer::new(&mut ex, container_box_header)?;
-        while !stream.is_eof() {
-            let sub_box_header = BoxHeader::new(stream)?;
-            if sub_box_header.box_type != "ipma" {
-                return Err(HeifError::InvalidFormat);
-            }
-            unimplemented!("ItemPropertiesBox")
-        }
-        Ok(Self {
-            box_header,
-            container,
-        })
-    }
-}
-
-trait ItemProperty {}
-
-pub struct ItemPropertyContainer {
-    pub box_header: BoxHeader,
-    pub properties: Vec<Box<ItemProperty>>,
-}
-
-impl ItemPropertyContainer {
-    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        if box_header.box_type != "ipco" {
-            // TODO: ?
-        }
-        let mut properties: Vec<Box<ItemProperty>> = Vec::new();
-        while !stream.is_eof() {
-            let sub_box_header = BoxHeader::new(stream)?;
-            let mut ex = stream.extract_from(&sub_box_header)?;
-            let property = if sub_box_header.box_type == "hvcC" {
-                HevcConfigurationBox::new(&mut ex, sub_box_header)?
-            // } else if sub_box_header.box_type == "ispe" {
-            //     ImageSpatialExtentsProperty::new(&mut ex, sub_box_header)?
-            } else {
-                unimplemented!("itemprop {}", sub_box_header.box_type)
-            };
-            properties.push(Box::new(property));
-        }
-        Ok(Self {
-            box_header,
-            properties,
-        })
-    }
-}
-
-impl std::fmt::Debug for ItemPropertyContainer {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "ItemPropertyContainer {:?}", self.box_header)
-    }
-}
+use crate::Result;
 
 #[derive(Debug)]
 pub struct HevcConfigurationBox {
@@ -73,7 +10,7 @@ pub struct HevcConfigurationBox {
 }
 
 impl HevcConfigurationBox {
-    fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         Ok(Self {
             box_header,
             hevc_config: HevcDecoderConfigurationRecord::new(stream)?,
