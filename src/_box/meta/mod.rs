@@ -1,3 +1,4 @@
+pub mod grpl;
 pub mod hdlr;
 pub mod iinf;
 pub mod iloc;
@@ -9,6 +10,7 @@ use crate::_box::{BoxHeader, FullBoxHeader};
 use crate::bit::Stream;
 use crate::Result;
 
+use grpl::GroupListBox;
 use hdlr::HandlerBox;
 use iinf::ItemInfoBox;
 use iloc::ItemLocationBox;
@@ -24,6 +26,7 @@ pub struct MetaBox {
     pub item_location_box: Option<ItemLocationBox>,
     pub item_reference_box: Option<ItemReferenceBox>,
     pub item_properties_box: Option<ItemPropertiesBox>,
+    pub group_list_box: Option<GroupListBox>,
 }
 
 impl MetaBox {
@@ -36,6 +39,7 @@ impl MetaBox {
         let mut item_info_box = None;
         let mut item_reference_box = None;
         let mut item_properties_box = None;
+        let mut group_list_box = None;
 
         while !stream.is_eof() {
             let child_box_header = BoxHeader::new(stream)?;
@@ -76,6 +80,11 @@ impl MetaBox {
                     println!(">>iprp {:?}", b);
                     item_properties_box = Some(b);
                 }
+                "grpl" => {
+                    let b = GroupListBox::new(&mut ex, child_box_header)?;
+                    println!(">>grpl {:?}", b);
+                    group_list_box = Some(b);
+                }
                 _ => panic!("unimplemented {},", child_box_header.box_type),
             };
         }
@@ -86,6 +95,7 @@ impl MetaBox {
             item_location_box,
             item_reference_box,
             item_properties_box,
+            group_list_box,
         })
     }
 }

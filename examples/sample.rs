@@ -4,8 +4,7 @@ use std::env;
 
 fn main() {
     for arg in env::args().skip(1) {
-        let path = format!("./examples/{}.heic", arg);
-        println!("[{}]", path);
-        heif::reader::HeifReader::from(path.as_str()).unwrap();
+        println!("\n[{}]\n", arg);
+        heif::reader::HeifReader::from(arg.as_str()).unwrap();
     }
 }
