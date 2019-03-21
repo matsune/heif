@@ -64,10 +64,9 @@ pub fn load(file_path: &str) -> Result<()> {
             meta_found = true;
             let mut ex = stream.extract_from(&header)?;
             let m_box = MetaBox::new(&mut ex, header)?;
-            println!("{:?}", m_box);
         } else if header.box_type == "mdat" {
             println!(">>SKIPPING {:?}", header);
-            stream.skip_bytes(header.get_box_size() as usize)?;
+            stream.skip_bytes(header.body_size() as usize)?;
         } else {
             panic!("unknown type {}", header.box_type)
         }

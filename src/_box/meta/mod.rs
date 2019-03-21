@@ -43,33 +43,38 @@ impl MetaBox {
             match child_box_header.box_type.as_str() {
                 "hdlr" => {
                     let sub_fullbox_header = FullBoxHeader::new(&mut ex, child_box_header)?;
-                    handler_box = Some(HandlerBox::new(&mut ex, sub_fullbox_header)?);
-                    println!(">>hdlr {:?}", handler_box);
+                    let b = HandlerBox::new(&mut ex, sub_fullbox_header)?;
+                    println!(">>hdlr {:?}", b);
+                    handler_box = Some(b);
                 }
                 "pitm" => {
                     let child_fullbox_header = FullBoxHeader::new(&mut ex, child_box_header)?;
-                    primary_item_box = Some(PrimaryItemBox::new(&mut ex, child_fullbox_header)?);
-                    println!(">>pitm {:?}", primary_item_box);
+                    let b = PrimaryItemBox::new(&mut ex, child_fullbox_header)?;
+                    println!(">>pitm {:?}", b);
+                    primary_item_box = Some(b);
                 }
                 "iloc" => {
                     let child_fullbox_header = FullBoxHeader::new(&mut ex, child_box_header)?;
-                    item_location_box = Some(ItemLocationBox::new(&mut ex, child_fullbox_header)?);
-                    println!(">>iloc {:?}", item_location_box);
+                    let b = ItemLocationBox::new(&mut ex, child_fullbox_header)?;
+                    println!(">>iloc {:?}", b);
+                    item_location_box = Some(b);
                 }
                 "iinf" => {
                     let child_fullbox_header = FullBoxHeader::new(&mut ex, child_box_header)?;
-                    item_info_box = Some(ItemInfoBox::new(&mut ex, child_fullbox_header)?);
-                    println!(">>iinf {:?}", item_info_box);
+                    let b = ItemInfoBox::new(&mut ex, child_fullbox_header)?;
+                    println!(">>iinf {:?}", b);
+                    item_info_box = Some(b);
                 }
                 "iref" => {
                     let child_fullbox_header = FullBoxHeader::new(&mut ex, child_box_header)?;
-                    item_reference_box =
-                        Some(ItemReferenceBox::new(&mut ex, child_fullbox_header)?);
-                    println!(">>iref {:?}", item_reference_box);
+                    let b = ItemReferenceBox::new(&mut ex, child_fullbox_header)?;
+                    println!(">>iref {:?}", b);
+                    item_reference_box = Some(b);
                 }
                 "iprp" => {
-                    item_properties_box = Some(ItemPropertiesBox::new(&mut ex, child_box_header)?);
-                    println!(">>iprp {:?}", item_properties_box);
+                    let b = ItemPropertiesBox::new(&mut ex, child_box_header)?;
+                    println!(">>iprp {:?}", b);
+                    item_properties_box = Some(b);
                 }
                 _ => panic!("unimplemented {},", child_box_header.box_type),
             };
