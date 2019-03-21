@@ -82,7 +82,7 @@ pub trait Stream {
     fn get_bit_offset(&self) -> u8;
     fn set_bit_offset(&mut self, n: u8);
     fn byte_at(&self, n: usize) -> u8;
-    fn extract(&mut self, size: usize) -> Result<Extract>;
+    fn read_bytes(&mut self, size: usize) -> Result<&[u8]>;
 
     fn num_bytes_left(&self) -> usize {
         self.len() - self.get_byte_offset()
@@ -144,6 +144,7 @@ pub trait Stream {
         self.set_byte_offset(self.get_byte_offset() + 8);
         Ok(byte8)
     }
+
 
     fn skip_bytes(&mut self, n: usize) -> Result<usize> {
         let left = self.num_bytes_left();
@@ -214,6 +215,10 @@ pub trait Stream {
         string
     }
 
+    fn extract(&mut self, size: usize) -> Result<Extract> {
+        Ok(Extract::new(self.read_bytes(size)?))
+    }
+
     fn extract_from<H: Header>(&mut self, header: &H) -> Result<Extract> {
         self.extract(header.body_size() as usize)
     }
@@ -261,13 +266,13 @@ impl<'a> Stream for Extract<'a> {
         self.inner[n]
     }
 
-    fn extract(&mut self, size: usize) -> Result<Extract> {
+    fn read_bytes(&mut self, size: usize) -> Result<&[u8]> {
         if !self.has_bytes(size) {
             return Err(HeifError::EOF);
         }
-        let inner = &self.inner[self.byte_offset..(self.byte_offset + size)];
+        let slice = &self.inner[self.byte_offset..(self.byte_offset + size)];
         self.byte_offset += size;
-        Ok(Extract::new(inner))
+        Ok(slice)
     }
 }
 
@@ -320,13 +325,13 @@ impl Stream for BitStream {
         self.inner[n]
     }
 
-    fn extract(&mut self, size: usize) -> Result<Extract> {
+    fn read_bytes(&mut self, size: usize) -> Result<&[u8]> {
         if !self.has_bytes(size) {
             return Err(HeifError::EOF);
         }
-        let inner = &self.inner[self.byte_offset..(self.byte_offset + size)];
+        let slice = &self.inner[self.byte_offset..(self.byte_offset + size)];
         self.byte_offset += size;
-        Ok(Extract::new(inner))
+        Ok(slice)
     }
 }
 

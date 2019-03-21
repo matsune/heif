@@ -1,6 +1,7 @@
 pub mod dinf;
 pub mod grpl;
 pub mod hdlr;
+pub mod idat;
 pub mod iinf;
 pub mod iloc;
 pub mod iprp;
@@ -14,6 +15,7 @@ use crate::Result;
 use dinf::DataInformationBox;
 use grpl::GroupListBox;
 use hdlr::HandlerBox;
+use idat::ItemDataBox;
 use iinf::ItemInfoBox;
 use iloc::ItemLocationBox;
 use iprp::ItemPropertiesBox;
@@ -30,6 +32,7 @@ pub struct MetaBox {
     pub item_properties_box: Option<ItemPropertiesBox>,
     pub group_list_box: Option<GroupListBox>,
     pub data_information_box: Option<DataInformationBox>,
+    pub item_data_box: Option<ItemDataBox>,
 }
 
 impl MetaBox {
@@ -44,6 +47,7 @@ impl MetaBox {
         let mut item_properties_box = None;
         let mut group_list_box = None;
         let mut data_information_box = None;
+        let mut item_data_box = None;
 
         while !stream.is_eof() {
             let child_box_header = BoxHeader::new(stream)?;
@@ -94,6 +98,11 @@ impl MetaBox {
                     println!(">>dinf {:?}", b);
                     data_information_box = Some(b);
                 }
+                "idat" => {
+                    let b = ItemDataBox::new(&mut ex, child_box_header)?;
+                    println!(">>idat {:?}", b);
+                    item_data_box = Some(b);
+                }
                 _ => panic!("unimplemented {},", child_box_header.box_type),
             };
         }
@@ -106,6 +115,7 @@ impl MetaBox {
             item_properties_box,
             group_list_box,
             data_information_box,
+            item_data_box,
         })
     }
 }
