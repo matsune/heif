@@ -7,6 +7,7 @@ pub struct GroupListBox {
     pub box_header: BoxHeader,
     pub entity_to_group_box_vector: Vec<EntityToGroupBox>,
 }
+
 impl GroupListBox {
     pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let mut entity_to_group_box_vector = Vec::new();
@@ -21,6 +22,7 @@ impl GroupListBox {
         })
     }
 }
+
 #[derive(Debug)]
 pub struct EntityToGroupBox {
     full_box_header: FullBoxHeader,
