@@ -1,5 +1,5 @@
 use crate::_box::{BoxHeader, FullBoxHeader};
-use crate::bit::Stream;
+use crate::bit::{Byte4, Stream};
 use crate::Result;
 
 #[derive(Debug, Default)]
@@ -30,12 +30,26 @@ impl ItemInfoBox {
         Ok(self)
     }
 
+    pub fn clear(&mut self) {
+        self.item_info_list.clear();
+    }
+
     pub fn item_ids(&self) -> Vec<u32> {
         self.item_info_list.iter().map(|i| i.item_id).collect()
     }
 
+    pub fn add_item_info_entry(&mut self, info_entry: ItemInfoEntry) {
+        self.item_info_list.push(info_entry);
+    }
+
     pub fn item_by_id(&self, id: u32) -> Option<&ItemInfoEntry> {
         self.item_info_list.iter().find(|i| i.item_id == id)
+    }
+
+    pub fn item_by_type(&self, item_type: Byte4) -> Option<&ItemInfoEntry> {
+        self.item_info_list
+            .iter()
+            .find(|i| i.item_type == item_type)
     }
 }
 
@@ -49,7 +63,7 @@ pub struct ItemInfoEntry {
     content_encoding: String,
     extension_type: String,
     item_info_extension: ItemInfoExtension,
-    item_type: String,
+    item_type: Byte4,
     item_uri_type: String,
 }
 
@@ -84,7 +98,7 @@ impl ItemInfoEntry {
                 0
             };
             self.item_protection_index = stream.read_2bytes()?.to_u16();
-            self.item_type = stream.read_4bytes()?.to_string();
+            self.item_type = stream.read_4bytes()?;
             self.item_name = stream.read_zero_term_string();
             if self.item_type == "mime" {
                 self.content_type = stream.read_zero_term_string();
@@ -102,7 +116,7 @@ impl ItemInfoEntry {
         &self.item_id
     }
 
-    fn set_item_id(&mut self, id: u32) {
+    fn set_item_id(&mut self, item_id: u32) {
         self.item_id = item_id;
     }
 
@@ -122,14 +136,45 @@ impl ItemInfoEntry {
         self.item_name = name;
     }
 
-    fn content_type(&self) -> &Stirng {
+    fn content_type(&self) -> &String {
         &self.content_type
     }
 
     fn set_content_type(&mut self, ctype: String) {
         self.content_type = ctype;
     }
-    //TODO
+
+    fn content_encoding(&self) -> &String {
+        &self.content_encoding
+    }
+
+    fn set_content_encoding(&mut self, enc: String) {
+        self.content_encoding = enc;
+    }
+
+    fn extension_type(&self) -> &String {
+        &self.extension_type
+    }
+
+    fn set_extension_type(&mut self, exType: String) {
+        self.extension_type = exType
+    }
+
+    fn item_type(&self) -> &Byte4 {
+        &self.item_type
+    }
+
+    fn set_item_type(&mut self, iType: Byte4) {
+        self.item_type = iType
+    }
+
+    fn item_uri_type(&self) -> &String {
+        &self.item_uri_type
+    }
+
+    fn set_item_uri_type(&mut self, uType: String) {
+        self.item_uri_type = uType;
+    }
 }
 
 #[derive(Default, Debug)]
@@ -162,7 +207,6 @@ impl ItemInfoExtension {
             group_id,
         })
     }
-
 
     fn content_location(&self) -> &String {
         &self.content_location

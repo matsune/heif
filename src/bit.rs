@@ -5,7 +5,7 @@ use crate::Result;
 use crate::_box::Header;
 use crate::error::HeifError;
 
-#[derive(Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq)]
 pub struct Byte2(pub u8, pub u8);
 
 impl Byte2 {
@@ -22,7 +22,7 @@ impl Byte2 {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq)]
 pub struct Byte4(pub u8, pub u8, pub u8, pub u8);
 
 impl Byte4 {
@@ -45,7 +45,13 @@ impl Byte4 {
     }
 }
 
-#[derive(Debug, PartialEq)]
+impl std::cmp::PartialEq<&str> for Byte4 {
+    fn eq(&self, other: &&str) -> bool {
+        self.to_string().as_str() == *other
+    }
+}
+
+#[derive(Default, Debug, PartialEq)]
 pub struct Byte8(
     pub u8,
     pub u8,
@@ -336,6 +342,7 @@ mod tests {
     #[test]
     fn test_byte4_to_string() {
         assert_eq!(Byte4(0x66, 0x74, 0x79, 0x70).to_string(), "ftyp");
+        assert!(Byte4(0x66, 0x74, 0x79, 0x70) == "ftyp");
     }
 
     #[test]
