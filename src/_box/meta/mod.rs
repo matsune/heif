@@ -9,8 +9,11 @@ pub mod iprp;
 pub mod iref;
 pub mod pitm;
 
+use std::collections::HashMap;
+
 use crate::_box::{BoxHeader, FullBoxHeader};
 use crate::bit::Stream;
+use crate::reader::ItemFeature;
 use crate::Result;
 
 use dinf::DataInformationBox;
@@ -81,5 +84,10 @@ impl MetaBox {
             };
         }
         Ok(self)
+    }
+
+    pub fn item_properties_map(&self) -> HashMap<u32, ItemFeature> {
+        let map = HashMap::new();
+        map
     }
 }

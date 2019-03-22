@@ -138,7 +138,7 @@ struct MetaBoxProperties {
 struct MetaBoxFeature {}
 
 #[derive(Debug)]
-struct ItemFeature {}
+pub struct ItemFeature {}
 
 #[derive(Debug)]
 struct EntityGrouping {
