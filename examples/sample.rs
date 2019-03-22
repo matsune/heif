@@ -3,8 +3,9 @@ extern crate heif;
 use std::env;
 
 fn main() {
+    let mut reader = heif::reader::HeifReader::default();
     for arg in env::args().skip(1) {
         println!("\n[{}]\n", arg);
-        heif::reader::HeifReader::from(arg.as_str()).unwrap();
+        reader.parse(arg.as_str()).unwrap();
     }
 }

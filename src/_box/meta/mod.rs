@@ -24,12 +24,13 @@ use iprp::ItemPropertiesBox;
 use iref::ItemReferenceBox;
 use pitm::PrimaryItemBox;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MetaBox {
     pub full_box_header: FullBoxHeader,
     pub handler_box: Option<HandlerBox>,
     pub primary_item_box: Option<PrimaryItemBox>,
     pub item_location_box: Option<ItemLocationBox>,
+    pub item_info_box: Option<ItemInfoBox>,
     pub item_reference_box: Option<ItemReferenceBox>,
     pub item_properties_box: Option<ItemPropertiesBox>,
     pub group_list_box: Option<GroupListBox>,
@@ -39,88 +40,46 @@ pub struct MetaBox {
 }
 
 impl MetaBox {
-    pub fn new<T: Stream>(stream: &mut T, header: BoxHeader) -> Result<MetaBox> {
-        let full_box_header = FullBoxHeader::new(stream, header)?;
+    pub fn new<T: Stream>(stream: &mut T, header: BoxHeader) -> Result<Self> {
+        let mut s = Self::default();
+        s.full_box_header = FullBoxHeader::new(stream, header)?;
+        s.parse(stream)
+    }
 
-        let mut handler_box = None;
-        let mut primary_item_box = None;
-        let mut item_location_box = None;
-        let mut item_info_box = None;
-        let mut item_reference_box = None;
-        let mut item_properties_box = None;
-        let mut group_list_box = None;
-        let mut data_information_box = None;
-        let mut item_data_box = None;
-        let mut item_protection_box = None;
-
+    fn parse<T: Stream>(mut self, stream: &mut T) -> Result<Self> {
         while !stream.is_eof() {
             let child_box_header = BoxHeader::new(stream)?;
             let mut ex = stream.extract_from(&child_box_header)?;
             match child_box_header.box_type.as_str() {
-                "hdlr" => {
-                    let b = HandlerBox::new(&mut ex, child_box_header)?;
-                    println!(">>hdlr {:?}", b);
-                    handler_box = Some(b);
-                }
+                "hdlr" => self.handler_box = Some(HandlerBox::new(&mut ex, child_box_header)?),
                 "pitm" => {
-                    let b = PrimaryItemBox::new(&mut ex, child_box_header)?;
-                    println!(">>pitm {:?}", b);
-                    primary_item_box = Some(b);
+                    self.primary_item_box = Some(PrimaryItemBox::new(&mut ex, child_box_header)?)
                 }
                 "iloc" => {
-                    let b = ItemLocationBox::new(&mut ex, child_box_header)?;
-                    println!(">>iloc {:?}", b);
-                    item_location_box = Some(b);
+                    self.item_location_box = Some(ItemLocationBox::new(&mut ex, child_box_header)?)
                 }
-                "iinf" => {
-                    let b = ItemInfoBox::new(&mut ex, child_box_header)?;
-                    println!(">>iinf {:?}", b);
-                    item_info_box = Some(b);
-                }
+                "iinf" => self.item_info_box = Some(ItemInfoBox::new(&mut ex, child_box_header)?),
                 "iref" => {
-                    let b = ItemReferenceBox::new(&mut ex, child_box_header)?;
-                    println!(">>iref {:?}", b);
-                    item_reference_box = Some(b);
+                    self.item_reference_box =
+                        Some(ItemReferenceBox::new(&mut ex, child_box_header)?)
                 }
                 "iprp" => {
-                    let b = ItemPropertiesBox::new(&mut ex, child_box_header)?;
-                    println!(">>iprp {:?}", b);
-                    item_properties_box = Some(b);
+                    self.item_properties_box =
+                        Some(ItemPropertiesBox::new(&mut ex, child_box_header)?)
                 }
-                "grpl" => {
-                    let b = GroupListBox::new(&mut ex, child_box_header)?;
-                    println!(">>grpl {:?}", b);
-                    group_list_box = Some(b);
-                }
+                "grpl" => self.group_list_box = Some(GroupListBox::new(&mut ex, child_box_header)?),
                 "dinf" => {
-                    let b = DataInformationBox::new(&mut ex, child_box_header)?;
-                    println!(">>dinf {:?}", b);
-                    data_information_box = Some(b);
+                    self.data_information_box =
+                        Some(DataInformationBox::new(&mut ex, child_box_header)?)
                 }
-                "idat" => {
-                    let b = ItemDataBox::new(&mut ex, child_box_header)?;
-                    println!(">>idat {:?}", b);
-                    item_data_box = Some(b);
-                }
+                "idat" => self.item_data_box = Some(ItemDataBox::new(&mut ex, child_box_header)?),
                 "ipro" => {
-                    let b = ItemProtectionBox::new(&mut ex, child_box_header)?;
-                    println!(">>ipro {:?}", b);
-                    item_protection_box = Some(b);
+                    self.item_protection_box =
+                        Some(ItemProtectionBox::new(&mut ex, child_box_header)?)
                 }
                 _ => {} //skip
             };
         }
-        Ok(MetaBox {
-            full_box_header,
-            handler_box,
-            primary_item_box,
-            item_location_box,
-            item_reference_box,
-            item_properties_box,
-            group_list_box,
-            data_information_box,
-            item_data_box,
-            item_protection_box,
-        })
+        Ok(self)
     }
 }

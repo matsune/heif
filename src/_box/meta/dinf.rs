@@ -3,6 +3,7 @@ use crate::bit::Stream;
 use crate::error::HeifError;
 use crate::Result;
 
+#[derive(Default)]
 pub struct DataInformationBox {
     pub box_header: BoxHeader,
     pub data_reference_box: Option<DataReferenceBox>,
@@ -16,17 +17,20 @@ impl std::fmt::Debug for DataInformationBox {
 
 impl DataInformationBox {
     pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let data_reference_box = if stream.is_eof() {
+        let mut s = Self::default();
+        s.box_header = box_header;
+        s.parse(stream)
+    }
+
+    fn parse<T: Stream>(mut self, stream: &mut T) -> Result<Self> {
+        self.data_reference_box = if stream.is_eof() {
             None
         } else {
-            let mut ex = stream.extract_from(&box_header)?;
+            let mut ex = stream.extract_from(&self.box_header)?;
             let child_box_header = BoxHeader::new(&mut ex)?;
             Some(DataReferenceBox::new(&mut ex, child_box_header)?)
         };
-        Ok(Self {
-            box_header,
-            data_reference_box,
-        })
+        Ok(self)
     }
 }
 

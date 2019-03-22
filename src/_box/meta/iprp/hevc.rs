@@ -138,7 +138,7 @@ impl HevcDecoderConfigurationRecord {
             None => {
                 let tmp = NalArray {
                     array_completeness,
-                    nal_unit_type: nal_unit_type,
+                    nal_unit_type,
                     nal_list: vec![v],
                 };
                 self.nal_array.push(tmp);
@@ -147,7 +147,7 @@ impl HevcDecoderConfigurationRecord {
     }
 }
 
-fn find_start_code_len(data: &Vec<u8>) -> usize {
+fn find_start_code_len(data: &[u8]) -> usize {
     let mut i = 0;
     let size = data.len();
     while (i + 1) < size && data[i] == 0 {

@@ -9,6 +9,7 @@ use crate::_box::{BoxHeader, Header};
 use crate::bit::{BitStream, Stream};
 use crate::error::HeifError;
 
+#[derive(Debug, Default)]
 pub struct HeifReader {
     ftyp: FileTypeBox,
     metabox_map: HashMap<u32, MetaBox>,
@@ -16,33 +17,40 @@ pub struct HeifReader {
 }
 
 impl HeifReader {
-    pub fn from(file_path: &str) -> Result<HeifReader> {
+    pub fn parse(&mut self, file_path: &str) -> Result<&mut Self> {
         let mut file = File::open(file_path).map_err(|_| HeifError::FileOpen)?;
         let mut stream = BitStream::from(&mut file)?;
-        let mut ftyp = Option::<FileTypeBox>::None;
-        let mut metabox_map = HashMap::new();
-        let mut movie_box = Option::<MovieBox>::None;
+        let mut ftyp_found = false;
+        let mut meta_found = false;
+        let mut movie_found = false;
+
+        self.metabox_map.clear();
+        // let mut metabox_map = HashMap::new();
+        // let mut movie_box = Option::<MovieBox>::None;
 
         while !stream.is_eof() {
             let header = BoxHeader::new(&mut stream)?;
             if header.box_type == "ftyp" {
-                if ftyp.is_some() {
+                if ftyp_found {
                     return Err(HeifError::InvalidFormat);
                 }
+                ftyp_found = true;
                 let mut ex = stream.extract_from(&header)?;
-                ftyp = Some(FileTypeBox::new(&mut ex, header)?);
+                self.ftyp.parse(&mut ex, header)?;
             } else if header.box_type == "meta" {
-                if metabox_map.get(&0).is_some() {
+                if meta_found {
                     return Err(HeifError::InvalidFormat);
                 }
+                meta_found = true;
                 let mut ex = stream.extract_from(&header)?;
-                metabox_map.insert(0, MetaBox::new(&mut ex, header)?);
+                self.metabox_map.insert(0, MetaBox::new(&mut ex, header)?);
             } else if header.box_type == "moov" {
-                if movie_box.is_some() {
+                if movie_found {
                     return Err(HeifError::InvalidFormat);
                 }
+                movie_found = true;
                 let mut ex = stream.extract_from(&header)?;
-                movie_box = Some(MovieBox::new(&mut ex, header)?);
+            // movie_box = Some(MovieBox::new(&mut ex, header)?);
             } else if header.box_type == "mdat"
                 || header.box_type == "free"
                 || header.box_type == "skip"
@@ -54,11 +62,11 @@ impl HeifReader {
                 stream.skip_bytes(header.body_size() as usize)?;
             }
         }
-        if ftyp.is_none() || (metabox_map.get(&0).is_none() && movie_box.is_none()) {
+        if !ftyp_found || (!meta_found && !movie_found) {
             return Err(HeifError::InvalidFormat);
         }
-        let ftyp = ftyp.unwrap();
-        Ok(HeifReader { ftyp, metabox_map })
+        println!("\n\n{:?}", self);
+        Ok(self)
     }
 }
 

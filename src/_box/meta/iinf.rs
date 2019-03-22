@@ -2,7 +2,7 @@ use crate::_box::{BoxHeader, FullBoxHeader};
 use crate::bit::Stream;
 use crate::Result;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ItemInfoBox {
     pub full_box_header: FullBoxHeader,
     pub item_info_list: Vec<ItemInfoEntry>,
@@ -33,22 +33,25 @@ pub struct ItemInfoExtension {
 }
 
 impl ItemInfoBox {
-    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<ItemInfoBox> {
-        let full_box_header = FullBoxHeader::new(stream, box_header)?;
-        let entry_count = if full_box_header.version == 0 {
+    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let mut s = Self::default();
+        s.full_box_header = FullBoxHeader::new(stream, box_header)?;
+        s.parse(stream)
+    }
+
+    pub fn parse<T: Stream>(mut self, stream: &mut T) -> Result<Self> {
+        let entry_count = if self.full_box_header.version == 0 {
             stream.read_2bytes()?.to_u32()
         } else {
             stream.read_4bytes()?.to_u32()
         };
-        let mut item_info_list = Vec::new();
+        self.item_info_list.clear();
         for _ in 0..entry_count {
             let entry_box_header = BoxHeader::new(stream)?;
-            item_info_list.push(ItemInfoEntry::new(stream, entry_box_header)?);
+            self.item_info_list
+                .push(ItemInfoEntry::new(stream, entry_box_header)?);
         }
-        Ok(ItemInfoBox {
-            full_box_header,
-            item_info_list,
-        })
+        Ok(self)
     }
 }
 

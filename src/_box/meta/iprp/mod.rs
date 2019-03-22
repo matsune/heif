@@ -10,7 +10,7 @@ use crate::Result;
 use hevc::HevcConfigurationBox;
 use ispe::ImageSpatialExtentsProperty;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ItemPropertiesBox {
     pub box_header: BoxHeader,
     pub container: ItemPropertyContainer,
@@ -19,28 +19,32 @@ pub struct ItemPropertiesBox {
 
 impl ItemPropertiesBox {
     pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let mut s = Self::default();
+        s.box_header = box_header;
+        s.parse(stream)
+    }
+
+    fn parse<T: Stream>(mut self, stream: &mut T) -> Result<Self> {
         let container_box_header = BoxHeader::new(stream)?;
         let mut ex = stream.extract_from(&container_box_header)?;
-        let container = ItemPropertyContainer::new(&mut ex, container_box_header)?;
-        let mut association_boxes = Vec::new();
+        self.container = ItemPropertyContainer::new(&mut ex, container_box_header)?;
+        self.association_boxes.clear();
         while !stream.is_eof() {
             let sub_box_header = BoxHeader::new(stream)?;
             if sub_box_header.box_type != "ipma" {
                 return Err(HeifError::InvalidFormat);
             }
             let mut ex = stream.extract_from(&sub_box_header)?;
-            association_boxes.push(ItemPropertyAssociation::new(&mut ex, sub_box_header)?);
+            self.association_boxes
+                .push(ItemPropertyAssociation::new(&mut ex, sub_box_header)?);
         }
-        Ok(Self {
-            box_header,
-            container,
-            association_boxes,
-        })
+        Ok(self)
     }
 }
 
 pub trait ItemProperty {}
 
+#[derive(Default)]
 pub struct ItemPropertyContainer {
     pub box_header: BoxHeader,
     pub properties: Vec<Box<ItemProperty>>,

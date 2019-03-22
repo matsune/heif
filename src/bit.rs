@@ -45,11 +45,6 @@ impl Byte4 {
     }
 }
 
-#[test]
-fn test_byte4_to_string() {
-    assert_eq!(Byte4(0x66, 0x74, 0x79, 0x70).to_string(), "ftyp");
-}
-
 #[derive(Debug, PartialEq)]
 pub struct Byte8(
     pub u8,
@@ -337,6 +332,11 @@ impl Stream for BitStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_byte4_to_string() {
+        assert_eq!(Byte4(0x66, 0x74, 0x79, 0x70).to_string(), "ftyp");
+    }
 
     #[test]
     fn test_num_bytes_left() {

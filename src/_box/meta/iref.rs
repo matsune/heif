@@ -2,7 +2,7 @@ use crate::_box::{BoxHeader, FullBoxHeader};
 use crate::bit::Stream;
 use crate::Result;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ItemReferenceBox {
     pub full_box_header: FullBoxHeader,
     pub reference_list: Vec<SingleItemTypeReferenceBox>,
@@ -10,19 +10,21 @@ pub struct ItemReferenceBox {
 
 impl ItemReferenceBox {
     pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::new(stream, box_header)?;
-        let is_large = full_box_header.version > 0;
-        let mut reference_list = Vec::new();
+        let mut s = Self::default();
+        s.full_box_header = FullBoxHeader::new(stream, box_header)?;
+        s.parse(stream)
+    }
+
+    fn parse<T: Stream>(mut self, stream: &mut T) -> Result<Self> {
+        let is_large = self.full_box_header.version > 0;
+        self.reference_list.clear();
         while !stream.is_eof() {
             let box_header = BoxHeader::new(stream)?;
-            reference_list.push(SingleItemTypeReferenceBox::new(
+            self.reference_list.push(SingleItemTypeReferenceBox::new(
                 stream, box_header, is_large,
             )?);
         }
-        Ok(Self {
-            full_box_header,
-            reference_list,
-        })
+        Ok(self)
     }
 }
 

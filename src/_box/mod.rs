@@ -14,7 +14,7 @@ pub trait Header {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct BoxHeader {
     pub box_size: u64,
     pub box_type: String,
@@ -88,7 +88,7 @@ mod tests {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FullBoxHeader {
     pub box_size: u64,
     pub box_type: String,
@@ -102,7 +102,7 @@ impl FullBoxHeader {
     pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let word = stream.read_4bytes()?;
         let version = word.0;
-        let flags = u32::from(word.1) << 16 + u32::from(word.2) << 8 + u32::from(word.3);
+        let flags = (u32::from(word.1) << 16) + (u32::from(word.2) << 8) + u32::from(word.3);
         Ok(Self {
             box_size: box_header.box_size,
             box_type: box_header.box_type,
