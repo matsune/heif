@@ -11,15 +11,17 @@ pub struct HandlerBox {
     name: String,
 }
 
-impl HandlerBox {
-    pub fn new() -> Self {
+impl Default for HandlerBox {
+    fn default() -> Self {
         Self {
             full_box_header: FullBoxHeader::new(Byte4::from_str("hdlr").unwrap(), 0, 0),
             handler_type: Byte4::default(),
             name: String::new(),
         }
     }
+}
 
+impl HandlerBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let full_box_header = FullBoxHeader::from(stream, box_header)?;
         stream.skip_bytes(4)?;

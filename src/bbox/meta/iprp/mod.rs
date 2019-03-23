@@ -18,15 +18,17 @@ pub struct ItemPropertiesBox {
     association_boxes: Vec<ItemPropertyAssociation>,
 }
 
-impl ItemPropertiesBox {
-    pub fn new() -> Self {
+impl Default for ItemPropertiesBox {
+    fn default() -> Self {
         Self {
             box_header: BoxHeader::new(Byte4::from_str("iprp").unwrap()),
-            container: ItemPropertyContainer::new(),
+            container: ItemPropertyContainer::default(),
             association_boxes: Vec::new(),
         }
     }
+}
 
+impl ItemPropertiesBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let box_header = box_header;
         let container_box_header = BoxHeader::from(stream)?;
@@ -51,7 +53,6 @@ impl ItemPropertiesBox {
 
 pub trait ItemProperty {}
 
-#[derive(Default)]
 pub struct ItemPropertyContainer {
     box_header: BoxHeader,
     properties: Vec<Box<ItemProperty>>,
@@ -63,14 +64,16 @@ impl std::fmt::Debug for ItemPropertyContainer {
     }
 }
 
-impl ItemPropertyContainer {
-    pub fn new() -> Self {
+impl Default for ItemPropertyContainer {
+    fn default() -> Self {
         Self {
             box_header: BoxHeader::new(Byte4::from_str("ipco").unwrap()),
             properties: Vec::new(),
         }
     }
+}
 
+impl ItemPropertyContainer {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         if box_header.box_type() != "ipco" {
             // TODO: ?
@@ -112,14 +115,16 @@ pub struct ItemPropertyAssociation {
 const PROPERTY_INDEX_WIDTH_LARGE: usize = 15;
 const PROPERTY_INDEX_WIDTH_SMALL: usize = 7;
 
-impl ItemPropertyAssociation {
-    fn new() -> Self {
+impl Default for ItemPropertyAssociation {
+    fn default() -> Self {
         Self {
             full_box_header: FullBoxHeader::new(Byte4::from_str("ipma").unwrap(), 0, 0),
             associations: HashMap::new(),
         }
     }
+}
 
+impl ItemPropertyAssociation {
     fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let full_box_header = FullBoxHeader::from(stream, box_header)?;
         let mut associations = HashMap::new();

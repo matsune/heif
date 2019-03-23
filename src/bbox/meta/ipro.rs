@@ -10,14 +10,16 @@ pub struct ItemProtectionBox {
     protection_info: Vec<ProtectionSchemeInfoBox>,
 }
 
-impl ItemProtectionBox {
-    pub fn new() -> Self {
+impl Default for ItemProtectionBox {
+    fn default() -> Self {
         Self {
             full_box_header: FullBoxHeader::new(Byte4::from_str("ipro").unwrap(), 0, 0),
             protection_info: Vec::new(),
         }
     }
+}
 
+impl ItemProtectionBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let full_box_header = FullBoxHeader::from(stream, box_header)?;
         let mut protection_info = Vec::new();
@@ -39,11 +41,13 @@ pub struct ProtectionSchemeInfoBox {
     data: Vec<u8>,
 }
 
-impl ProtectionSchemeInfoBox {
-    pub fn new() -> Self {
+impl Default for ProtectionSchemeInfoBox {
+    fn default() -> Self {
         Self { data: Vec::new() }
     }
+}
 
+impl ProtectionSchemeInfoBox {
     pub fn from<T: Stream>(stream: &mut T) -> Result<Self> {
         Ok(Self {
             data: stream.read_bytes(stream.num_bytes_left())?.to_vec(),

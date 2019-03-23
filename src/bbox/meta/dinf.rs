@@ -10,17 +10,19 @@ pub struct DataInformationBox {
     data_reference_box: DataReferenceBox,
 }
 
-impl DataInformationBox {
-    pub fn new() -> Self {
+impl Default for DataInformationBox {
+    fn default() -> Self {
         Self {
             box_header: BoxHeader::new(Byte4::from_str("dinf").unwrap()),
-            data_reference_box: DataReferenceBox::new(),
+            data_reference_box: DataReferenceBox::default(),
         }
     }
+}
 
+impl DataInformationBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let data_reference_box = if stream.is_eof() {
-            DataReferenceBox::new()
+            DataReferenceBox::default()
         } else {
             let mut ex = stream.extract_from(&box_header)?;
             let child_box_header = BoxHeader::from(&mut ex)?;
@@ -52,14 +54,16 @@ impl std::fmt::Debug for DataReferenceBox {
     }
 }
 
-impl DataReferenceBox {
-    pub fn new() -> Self {
+impl Default for DataReferenceBox {
+    fn default() -> Self {
         Self {
             full_box_header: FullBoxHeader::new(Byte4::from_str("dref").unwrap(), 0, 0),
             data_entries: Vec::new(),
         }
     }
+}
 
+impl DataReferenceBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         Self {
             full_box_header: FullBoxHeader::from(stream, box_header)?,
@@ -123,15 +127,17 @@ pub struct DataEntryUrnBox {
     name: String,
 }
 
-impl DataEntryUrnBox {
-    pub fn new() -> Self {
+impl Default for DataEntryUrnBox {
+    fn default() -> Self {
         Self {
             full_box_header: FullBoxHeader::new(Byte4::from_str("urn ").unwrap(), 0, 0),
             location: String::new(),
             name: String::new(),
         }
     }
+}
 
+impl DataEntryUrnBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let full_box_header = FullBoxHeader::from(stream, box_header)?;
         let name = stream.read_zero_term_string();

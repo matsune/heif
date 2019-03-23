@@ -13,7 +13,7 @@ pub struct HevcConfigurationBox {
 
 impl Default for HevcConfigurationBox {
     fn default() -> Self {
-        Self::new(HevcDecoderConfigurationRecord::new())
+        Self::new(HevcDecoderConfigurationRecord::default())
     }
 }
 
@@ -63,8 +63,8 @@ pub struct HevcDecoderConfigurationRecord {
     nal_array: Vec<NalArray>,
 }
 
-impl HevcDecoderConfigurationRecord {
-    fn new() -> Self {
+impl Default for HevcDecoderConfigurationRecord {
+    fn default() -> Self {
         Self {
             configuration_version: 1,
             general_profile_space: 0,
@@ -92,7 +92,9 @@ impl HevcDecoderConfigurationRecord {
             nal_array: Vec::new(),
         }
     }
+}
 
+impl HevcDecoderConfigurationRecord {
     fn from<T: Stream>(stream: &mut T) -> Result<Self> {
         let configuration_version = stream.read_byte()?;
         let general_profile_space = stream.read_bits(2)? as u8;

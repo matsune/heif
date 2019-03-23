@@ -10,14 +10,16 @@ pub struct PrimaryItemBox {
     item_id: u32,
 }
 
-impl PrimaryItemBox {
-    pub fn new() -> Self {
+impl Default for PrimaryItemBox {
+    fn default() -> Self {
         Self {
             full_box_header: FullBoxHeader::new(Byte4::from_str("pitm").unwrap(), 0, 0),
             item_id: 0,
         }
     }
+}
 
+impl PrimaryItemBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let full_box_header = FullBoxHeader::from(stream, box_header)?;
         let item_id = if full_box_header.version() == 0 {
@@ -29,5 +31,13 @@ impl PrimaryItemBox {
             full_box_header,
             item_id,
         })
+    }
+
+    pub fn item_id(&self) -> u32 {
+        self.item_id
+    }
+
+    pub fn set_item_id(&mut self, id: u32) {
+        self.item_id = id;
     }
 }

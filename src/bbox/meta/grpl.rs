@@ -10,14 +10,16 @@ pub struct GroupListBox {
     entity_to_group_box_vector: Vec<EntityToGroupBox>,
 }
 
-impl GroupListBox {
-    pub fn new() -> Self {
+impl Default for GroupListBox {
+    fn default() -> Self {
         Self {
             box_header: BoxHeader::new(Byte4::from_str("grpl").unwrap()),
             entity_to_group_box_vector: Vec::new(),
         }
     }
+}
 
+impl GroupListBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let mut entity_to_group_box_vector = Vec::new();
         while !stream.is_eof() {

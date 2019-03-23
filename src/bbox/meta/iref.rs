@@ -10,14 +10,16 @@ pub struct ItemReferenceBox {
     reference_list: Vec<SingleItemTypeReferenceBox>,
 }
 
-impl ItemReferenceBox {
-    pub fn new() -> Self {
+impl Default for ItemReferenceBox {
+    fn default() -> Self {
         Self {
             full_box_header: FullBoxHeader::new(Byte4::from_str("iref").unwrap(), 0, 0),
             reference_list: Vec::new(),
         }
     }
+}
 
+impl ItemReferenceBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let full_box_header = FullBoxHeader::from(stream, box_header)?;
         let is_large = full_box_header.version() > 0;
@@ -74,5 +76,29 @@ impl SingleItemTypeReferenceBox {
             to_item_ids,
             is_large,
         })
+    }
+
+    pub fn set_reference_type(&mut self, r_type: Byte4) {
+        self.box_header.set_box_type(r_type);
+    }
+
+    pub fn from_item_id(&self) -> u32 {
+        self.from_item_id
+    }
+
+    pub fn set_from_item_id(&mut self, id: u32) {
+        self.from_item_id = id;
+    }
+
+    pub fn add_to_item_id(&mut self, id: u32) {
+        self.to_item_ids.push(id);
+    }
+
+    pub fn clear_to_item_id(&mut self) {
+        self.to_item_ids.clear();
+    }
+
+    pub fn to_item_ids(&self) -> &Vec<u32> {
+        &self.to_item_ids
     }
 }

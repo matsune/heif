@@ -11,8 +11,8 @@ struct ItemLocationExtent {
     extent_length: usize,
 }
 
-impl ItemLocationExtent {
-    fn new() -> Self {
+impl Default for ItemLocationExtent {
+    fn default() -> Self {
         Self {
             extent_index: 0,
             extent_offset: 0,
@@ -47,9 +47,9 @@ pub struct ItemLocation {
     extent_list: Vec<ItemLocationExtent>,
 }
 
-impl ItemLocation {
-    fn new() -> Self {
-        ItemLocation {
+impl Default for ItemLocation {
+    fn default() -> Self {
+        Self {
             item_id: 0,
             method: ConstructionMethod::FileOffset,
             data_ref_index: 0,
@@ -69,8 +69,8 @@ pub struct ItemLocationBox {
     pub locations: Vec<ItemLocation>,
 }
 
-impl ItemLocationBox {
-    pub fn new() -> Self {
+impl Default for ItemLocationBox {
+    fn default() -> Self {
         Self {
             full_box_header: FullBoxHeader::new(Byte4::from_str("iloc").unwrap(), 0, 0),
             offset_size: 4,
@@ -80,7 +80,9 @@ impl ItemLocationBox {
             locations: Vec::new(),
         }
     }
+}
 
+impl ItemLocationBox {
     pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let full_box_header = FullBoxHeader::from(stream, box_header)?;
         let offset_size = stream.read_bits(4)? as u8;
@@ -103,7 +105,7 @@ impl ItemLocationBox {
 
         let mut locations = Vec::new();
         for _ in 0..item_count {
-            let mut item_loc = ItemLocation::new();
+            let mut item_loc = ItemLocation::default();
             item_loc.item_id = if full_box_header.version() < 2 {
                 stream.read_2bytes()?.to_u32()
             } else if full_box_header.version() == 2 {
@@ -120,7 +122,7 @@ impl ItemLocationBox {
             item_loc.base_offset = stream.read_bits(usize::from(base_offset_size) * 8)?;
             let extent_count = stream.read_2bytes()?.to_u16();
             for _ in 0..extent_count {
-                let mut loc_ext = ItemLocationExtent::new();
+                let mut loc_ext = ItemLocationExtent::default();
                 if (full_box_header.version() == 1 || full_box_header.version() == 2)
                     && index_size > 0
                 {
