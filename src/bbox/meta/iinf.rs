@@ -1,33 +1,45 @@
-use crate::_box::{BoxHeader, FullBoxHeader};
+use crate::bbox::header::{BoxHeader, FullBoxHeader};
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
-#[derive(Debug, Default)]
+use std::str::FromStr;
+
+#[derive(Debug)]
 pub struct ItemInfoBox {
-    pub full_box_header: FullBoxHeader,
-    pub item_info_list: Vec<ItemInfoEntry>,
+    full_box_header: FullBoxHeader,
+    item_info_list: Vec<ItemInfoEntry>,
+}
+
+impl Default for ItemInfoBox {
+    fn default() -> Self {
+        ItemInfoBox::new(0)
+    }
 }
 
 impl ItemInfoBox {
-    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let mut s = Self::default();
-        s.full_box_header = FullBoxHeader::new(stream, box_header)?;
-        s.parse(stream)
+    pub fn new(version: u8) -> Self {
+        Self {
+            full_box_header: FullBoxHeader::new(Byte4::from_str("iinf").unwrap(), version, 0),
+            item_info_list: Vec::new(),
+        }
     }
 
-    pub fn parse<T: Stream>(mut self, stream: &mut T) -> Result<Self> {
-        let entry_count = if self.full_box_header.version == 0 {
+    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+        let entry_count = if full_box_header.version() == 0 {
             stream.read_2bytes()?.to_u32()
         } else {
             stream.read_4bytes()?.to_u32()
         };
-        self.item_info_list.clear();
+        let mut item_info_list = Vec::new();
         for _ in 0..entry_count {
-            let entry_box_header = BoxHeader::new(stream)?;
-            self.item_info_list
-                .push(ItemInfoEntry::new(stream, entry_box_header)?);
+            let entry_box_header = BoxHeader::from(stream)?;
+            item_info_list.push(ItemInfoEntry::new(stream, entry_box_header)?);
         }
-        Ok(self)
+        Ok(Self {
+            full_box_header,
+            item_info_list,
+        })
     }
 
     pub fn clear(&mut self) {
@@ -70,17 +82,17 @@ pub struct ItemInfoEntry {
 impl ItemInfoEntry {
     pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let mut s = Self::default();
-        s.full_box_header = FullBoxHeader::new(stream, box_header)?;
+        s.full_box_header = FullBoxHeader::from(stream, box_header)?;
         s.parse(stream)
     }
 
     fn parse<T: Stream>(mut self, stream: &mut T) -> Result<Self> {
-        if self.full_box_header.version == 0 || self.full_box_header.version == 1 {
+        if self.full_box_header.version() == 0 || self.full_box_header.version() == 1 {
             self.item_id = stream.read_2bytes()?.to_u32();
             self.item_protection_index = stream.read_2bytes()?.to_u16();
         }
 
-        if self.full_box_header.version == 1 {
+        if self.full_box_header.version() == 1 {
             if stream.num_bytes_left() > 0 {
                 self.extension_type = stream.read_4bytes()?.to_string();
             }
@@ -89,10 +101,10 @@ impl ItemInfoEntry {
             }
         }
 
-        if self.full_box_header.version >= 2 {
-            self.item_id = if self.full_box_header.version == 2 {
+        if self.full_box_header.version() >= 2 {
+            self.item_id = if self.full_box_header.version() == 2 {
                 stream.read_2bytes()?.to_u32()
-            } else if self.full_box_header.version == 3 {
+            } else if self.full_box_header.version() == 3 {
                 stream.read_4bytes()?.to_u32()
             } else {
                 0
@@ -112,68 +124,68 @@ impl ItemInfoEntry {
         Ok(self)
     }
 
-    fn item_id(&self) -> &u32 {
+    pub fn item_id(&self) -> &u32 {
         &self.item_id
     }
 
-    fn set_item_id(&mut self, item_id: u32) {
+    pub fn set_item_id(&mut self, item_id: u32) {
         self.item_id = item_id;
     }
 
-    fn item_protection_index(&self) -> &u16 {
+    pub fn item_protection_index(&self) -> &u16 {
         &self.item_protection_index
     }
 
-    fn set_item_protection_index(&mut self, idx: u16) {
+    pub fn set_item_protection_index(&mut self, idx: u16) {
         self.item_protection_index = idx;
     }
 
-    fn item_name(&self) -> &String {
+    pub fn item_name(&self) -> &String {
         &self.item_name
     }
 
-    fn set_item_name(&mut self, name: String) {
+    pub fn set_item_name(&mut self, name: String) {
         self.item_name = name;
     }
 
-    fn content_type(&self) -> &String {
+    pub fn content_type(&self) -> &String {
         &self.content_type
     }
 
-    fn set_content_type(&mut self, ctype: String) {
-        self.content_type = ctype;
+    pub fn set_content_type(&mut self, content_type: String) {
+        self.content_type = content_type;
     }
 
-    fn content_encoding(&self) -> &String {
+    pub fn content_encoding(&self) -> &String {
         &self.content_encoding
     }
 
-    fn set_content_encoding(&mut self, enc: String) {
+    pub fn set_content_encoding(&mut self, enc: String) {
         self.content_encoding = enc;
     }
 
-    fn extension_type(&self) -> &String {
+    pub fn extension_type(&self) -> &String {
         &self.extension_type
     }
 
-    fn set_extension_type(&mut self, exType: String) {
-        self.extension_type = exType
+    pub fn set_extension_type(&mut self, ex_type: String) {
+        self.extension_type = ex_type
     }
 
-    fn item_type(&self) -> &Byte4 {
+    pub fn item_type(&self) -> &Byte4 {
         &self.item_type
     }
 
-    fn set_item_type(&mut self, iType: Byte4) {
-        self.item_type = iType
+    pub fn set_item_type(&mut self, i_type: Byte4) {
+        self.item_type = i_type
     }
 
-    fn item_uri_type(&self) -> &String {
+    pub fn item_uri_type(&self) -> &String {
         &self.item_uri_type
     }
 
-    fn set_item_uri_type(&mut self, uType: String) {
-        self.item_uri_type = uType;
+    pub fn set_item_uri_type(&mut self, u_type: String) {
+        self.item_uri_type = u_type;
     }
 }
 
@@ -208,51 +220,51 @@ impl ItemInfoExtension {
         })
     }
 
-    fn content_location(&self) -> &String {
+    pub fn content_location(&self) -> &String {
         &self.content_location
     }
 
-    fn set_content_location(&mut self, location: String) {
+    pub fn set_content_location(&mut self, location: String) {
         self.content_location = location;
     }
 
-    fn content_md5(&self) -> &String {
+    pub fn content_md5(&self) -> &String {
         &self.content_md5
     }
 
-    fn set_content_md5(&mut self, md5: String) {
+    pub fn set_content_md5(&mut self, md5: String) {
         self.content_md5 = md5;
     }
 
-    fn content_length(&self) -> &u64 {
+    pub fn content_length(&self) -> &u64 {
         &self.content_length
     }
 
-    fn set_content_length(&mut self, length: u64) {
+    pub fn set_content_length(&mut self, length: u64) {
         self.content_length = length;
     }
 
-    fn transfer_length(&self) -> &u64 {
+    pub fn transfer_length(&self) -> &u64 {
         &self.transfer_length
     }
 
-    fn set_transfer_length(&mut self, len: u64) {
+    pub fn set_transfer_length(&mut self, len: u64) {
         self.transfer_length = len;
     }
 
-    fn entry_count(&self) -> &u8 {
+    pub fn entry_count(&self) -> &u8 {
         &self.entry_count
     }
 
-    fn set_entry_count(&mut self, count: u8) {
+    pub fn set_entry_count(&mut self, count: u8) {
         self.entry_count = count;
     }
 
-    fn group_id_at(&self, index: usize) -> Option<&u32> {
+    pub fn group_id_at(&self, index: usize) -> Option<&u32> {
         self.group_id.get(index)
     }
 
-    fn set_group_id_at(&mut self, id: u32, index: usize) {
+    pub fn set_group_id_at(&mut self, id: u32, index: usize) {
         self.group_id[index] = id;
     }
 }

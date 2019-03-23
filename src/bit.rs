@@ -1,9 +1,12 @@
 use std::fs::File;
 use std::io::Read;
+use std::str::FromStr;
 
-use crate::Result;
-use crate::_box::Header;
-use crate::error::HeifError;
+use crate::bbox::header::Header;
+use crate::{HeifError, Result};
+
+#[derive(Debug)]
+pub struct ParseBytesError;
 
 #[derive(Default, Debug, PartialEq)]
 pub struct Byte2(pub u8, pub u8);
@@ -19,6 +22,22 @@ impl Byte2 {
 
     pub fn to_u64(&self) -> u64 {
         u64::from(self.to_u16())
+    }
+
+    pub fn to_usize(&self) -> usize {
+        usize::from(self.to_u16())
+    }
+}
+
+impl FromStr for Byte2 {
+    type Err = ParseBytesError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let bytes = s.as_bytes();
+        if bytes.len() != 2 {
+            return Err(Self::Err {});
+        }
+        Ok(Self(bytes[0], bytes[1]))
     }
 }
 
@@ -37,6 +56,10 @@ impl Byte4 {
         u64::from(self.to_u32())
     }
 
+    pub fn to_usize(&self) -> usize {
+        self.to_u32() as usize
+    }
+
     pub fn to_string(&self) -> String {
         format!(
             "{}{}{}{}",
@@ -45,9 +68,27 @@ impl Byte4 {
     }
 }
 
+impl FromStr for Byte4 {
+    type Err = ParseBytesError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let bytes = s.as_bytes();
+        if bytes.len() != 4 {
+            return Err(Self::Err {});
+        }
+        Ok(Self(bytes[0], bytes[1], bytes[2], bytes[3]))
+    }
+}
+
 impl std::cmp::PartialEq<&str> for Byte4 {
     fn eq(&self, other: &&str) -> bool {
         self.to_string().as_str() == *other
+    }
+}
+
+impl std::cmp::PartialEq<str> for Byte4 {
+    fn eq(&self, other: &str) -> bool {
+        self.to_string().as_str() == other
     }
 }
 
@@ -339,126 +380,159 @@ impl Stream for BitStream {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_byte4_to_string() {
-        assert_eq!(Byte4(0x66, 0x74, 0x79, 0x70).to_string(), "ftyp");
-        assert!(Byte4(0x66, 0x74, 0x79, 0x70) == "ftyp");
+    mod byte2 {
+        use super::*;
+
+        #[test]
+        fn test_from_str() {
+            assert_eq!(Byte2::from_str("ab").unwrap(), Byte2(0x61, 0x62));
+            assert!(Byte2::from_str("a").is_err());
+            assert!(Byte2::from_str("abc").is_err());
+        }
     }
 
-    #[test]
-    fn test_num_bytes_left() {
-        let mut stream = BitStream::new(vec![10, 11]);
-        assert_eq!(stream.num_bytes_left(), 2);
-        stream.byte_offset += 1;
-        assert_eq!(stream.num_bytes_left(), 1);
-        stream.byte_offset += 1;
-        assert_eq!(stream.num_bytes_left(), 0);
+    mod byte4 {
+        use super::*;
+
+        #[test]
+        fn test_from_str() {
+            assert_eq!(
+                Byte4::from_str("abcd").unwrap(),
+                Byte4(0x61, 0x62, 0x63, 0x64)
+            );
+            assert!(Byte4::from_str("a").is_err());
+            assert!(Byte4::from_str("abcde").is_err());
+        }
+
+        #[test]
+        fn test_to_string() {
+            assert_eq!(Byte4(0x66, 0x74, 0x79, 0x70).to_string(), "ftyp");
+        }
+
+        #[test]
+        fn test_eq_string() {
+            assert!(Byte4(0x66, 0x74, 0x79, 0x70) == "ftyp");
+        }
     }
 
-    #[test]
-    fn test_has_bytes() {
-        let mut stream = BitStream::new(vec![10, 11]);
-        assert!(stream.has_bytes(2));
-        stream.byte_offset += 1;
-        assert!(stream.has_bytes(1));
-        stream.byte_offset += 1;
-        assert!(!stream.has_bytes(1));
-    }
+    mod stream {
+        use super::*;
 
-    #[test]
-    fn test_read_byte() {
-        let mut stream = BitStream::new(vec![10, 11]);
-        assert_eq!(stream.byte_offset, 0);
-        assert_eq!(stream.read_byte().unwrap(), 10);
-        assert_eq!(stream.byte_offset, 1);
-        assert_eq!(stream.read_byte().unwrap(), 11);
-        assert_eq!(stream.byte_offset, 2);
-        assert!(stream.read_byte().is_err());
-    }
+        #[test]
+        fn test_num_bytes_left() {
+            let mut stream = BitStream::new(vec![10, 11]);
+            assert_eq!(stream.num_bytes_left(), 2);
+            stream.byte_offset += 1;
+            assert_eq!(stream.num_bytes_left(), 1);
+            stream.byte_offset += 1;
+            assert_eq!(stream.num_bytes_left(), 0);
+        }
 
-    #[test]
-    fn test_read_2bytes() {
-        let mut stream = BitStream::new(vec![10, 11, 12]);
-        assert_eq!(stream.byte_offset, 0);
-        assert_eq!(stream.read_2bytes().unwrap(), Byte2(10, 11));
-        assert_eq!(stream.byte_offset, 2);
-        assert!(stream.read_2bytes().is_err());
-    }
+        #[test]
+        fn test_has_bytes() {
+            let mut stream = BitStream::new(vec![10, 11]);
+            assert!(stream.has_bytes(2));
+            stream.byte_offset += 1;
+            assert!(stream.has_bytes(1));
+            stream.byte_offset += 1;
+            assert!(!stream.has_bytes(1));
+        }
 
-    #[test]
-    fn test_read_4bytes() {
-        let mut stream = BitStream::new(vec![10, 11, 12, 13]);
-        assert_eq!(stream.byte_offset, 0);
-        assert_eq!(stream.read_4bytes().unwrap(), Byte4(10, 11, 12, 13));
-        assert_eq!(stream.byte_offset, 4);
-        assert!(stream.read_4bytes().is_err());
-    }
+        #[test]
+        fn test_read_byte() {
+            let mut stream = BitStream::new(vec![10, 11]);
+            assert_eq!(stream.byte_offset, 0);
+            assert_eq!(stream.read_byte().unwrap(), 10);
+            assert_eq!(stream.byte_offset, 1);
+            assert_eq!(stream.read_byte().unwrap(), 11);
+            assert_eq!(stream.byte_offset, 2);
+            assert!(stream.read_byte().is_err());
+        }
 
-    #[test]
-    fn test_read_8bytes() {
-        let mut stream = BitStream::new(vec![10, 11, 12, 13, 14, 15, 16, 17]);
-        assert_eq!(stream.byte_offset, 0);
-        assert_eq!(
-            stream.read_8bytes().unwrap(),
-            Byte8(10, 11, 12, 13, 14, 15, 16, 17)
-        );
-        assert_eq!(stream.byte_offset, 8);
-        assert!(stream.read_8bytes().is_err());
-    }
+        #[test]
+        fn test_read_2bytes() {
+            let mut stream = BitStream::new(vec![10, 11, 12]);
+            assert_eq!(stream.byte_offset, 0);
+            assert_eq!(stream.read_2bytes().unwrap(), Byte2(10, 11));
+            assert_eq!(stream.byte_offset, 2);
+            assert!(stream.read_2bytes().is_err());
+        }
 
-    #[test]
-    fn test_is_eof() {
-        let mut stream = BitStream::new(vec![10]);
-        assert!(!stream.is_eof());
-        stream.byte_offset += 1;
-        assert!(stream.is_eof());
-    }
+        #[test]
+        fn test_read_4bytes() {
+            let mut stream = BitStream::new(vec![10, 11, 12, 13]);
+            assert_eq!(stream.byte_offset, 0);
+            assert_eq!(stream.read_4bytes().unwrap(), Byte4(10, 11, 12, 13));
+            assert_eq!(stream.byte_offset, 4);
+            assert!(stream.read_4bytes().is_err());
+        }
 
-    #[test]
-    fn test_skip_bytes() {
-        let mut stream = BitStream::new(vec![10, 11, 12]);
-        assert_eq!(stream.skip_bytes(3).unwrap(), 3);
-        assert!(stream.skip_bytes(1).is_err());
-    }
+        #[test]
+        fn test_read_8bytes() {
+            let mut stream = BitStream::new(vec![10, 11, 12, 13, 14, 15, 16, 17]);
+            assert_eq!(stream.byte_offset, 0);
+            assert_eq!(
+                stream.read_8bytes().unwrap(),
+                Byte8(10, 11, 12, 13, 14, 15, 16, 17)
+            );
+            assert_eq!(stream.byte_offset, 8);
+            assert!(stream.read_8bytes().is_err());
+        }
 
-    #[test]
-    fn test_current_byte() {
-        let mut stream = BitStream::new(vec![10]);
-        assert_eq!(stream.current_byte().unwrap(), 10);
-        stream.byte_offset += 1;
-        assert!(stream.current_byte().is_err());
-    }
+        #[test]
+        fn test_is_eof() {
+            let mut stream = BitStream::new(vec![10]);
+            assert!(!stream.is_eof());
+            stream.byte_offset += 1;
+            assert!(stream.is_eof());
+        }
 
-    #[test]
-    fn test_read_bits() {
-        let mut stream = BitStream::new(vec![15, 16, 17]); // 0F 00001111
-        assert_eq!(stream.read_bits(5).unwrap(), 1); // 00001
-        assert_eq!(stream.bit_offset, 5);
-        assert_eq!(stream.read_bits(3).unwrap(), 7); // 111
-        assert_eq!(stream.bit_offset, 0);
-        assert_eq!(stream.byte_offset, 1);
-        // A0 A1  00010000 00010001
-        assert_eq!(stream.read_bits(3).unwrap(), 0); // 000
-        assert_eq!(stream.bit_offset, 3);
-        assert_eq!(stream.read_bits(10).unwrap(), 514); // 10000 00010
-        assert_eq!(stream.bit_offset, 5);
-        assert_eq!(stream.byte_offset, 2);
-    }
+        #[test]
+        fn test_skip_bytes() {
+            let mut stream = BitStream::new(vec![10, 11, 12]);
+            assert_eq!(stream.skip_bytes(3).unwrap(), 3);
+            assert!(stream.skip_bytes(1).is_err());
+        }
 
-    #[test]
-    fn test_read_zero_term_string() {
-        let mut stream = BitStream::new(vec![
-            's' as u8, 't' as u8, 'r' as u8, 'i' as u8, 'n' as u8, 'g' as u8, 0,
-        ]);
-        assert_eq!(stream.read_zero_term_string(), "string");
-    }
+        #[test]
+        fn test_current_byte() {
+            let mut stream = BitStream::new(vec![10]);
+            assert_eq!(stream.current_byte().unwrap(), 10);
+            stream.byte_offset += 1;
+            assert!(stream.current_byte().is_err());
+        }
 
-    #[test]
-    fn test_extract() {
-        let mut stream = BitStream::new(vec![0, 1, 2, 3, 4]);
-        let ex = stream.extract(3).unwrap();
-        assert_eq!(ex.inner, [0, 1, 2]);
-        let ex = stream.extract(3);
-        assert!(ex.is_err());
+        #[test]
+        fn test_read_bits() {
+            let mut stream = BitStream::new(vec![15, 16, 17]); // 0F 00001111
+            assert_eq!(stream.read_bits(5).unwrap(), 1); // 00001
+            assert_eq!(stream.bit_offset, 5);
+            assert_eq!(stream.read_bits(3).unwrap(), 7); // 111
+            assert_eq!(stream.bit_offset, 0);
+            assert_eq!(stream.byte_offset, 1);
+            // A0 A1  00010000 00010001
+            assert_eq!(stream.read_bits(3).unwrap(), 0); // 000
+            assert_eq!(stream.bit_offset, 3);
+            assert_eq!(stream.read_bits(10).unwrap(), 514); // 10000 00010
+            assert_eq!(stream.bit_offset, 5);
+            assert_eq!(stream.byte_offset, 2);
+        }
+
+        #[test]
+        fn test_read_zero_term_string() {
+            let mut stream = BitStream::new(vec![
+                's' as u8, 't' as u8, 'r' as u8, 'i' as u8, 'n' as u8, 'g' as u8, 0,
+            ]);
+            assert_eq!(stream.read_zero_term_string(), "string");
+        }
+
+        #[test]
+        fn test_extract() {
+            let mut stream = BitStream::new(vec![0, 1, 2, 3, 4]);
+            let ex = stream.extract(3).unwrap();
+            assert_eq!(ex.inner, [0, 1, 2]);
+            let ex = stream.extract(3);
+            assert!(ex.is_err());
+        }
     }
 }

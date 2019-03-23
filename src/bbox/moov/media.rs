@@ -1,5 +1,5 @@
-use crate::_box::meta::dinf::DataEntry;
-use crate::_box::{BoxHeader, FullBoxHeader};
+use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::meta::dinf::DataEntry;
 
 #[derive(Debug)]
 pub struct MediaBox {

@@ -1,13 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 
-use crate::Result;
-use crate::_box::ftyp::FileTypeBox;
-use crate::_box::meta::MetaBox;
-use crate::_box::moov::MovieBox;
-use crate::_box::{BoxHeader, Header};
-use crate::bit::{BitStream, Stream};
-use crate::error::HeifError;
+use crate::bbox::ftyp::FileTypeBox;
+use crate::bbox::header::{BoxHeader, Header};
+use crate::bbox::meta::MetaBox;
+use crate::bbox::moov::MovieBox;
+use crate::bit::{BitStream, Byte4, Stream};
+use crate::{HeifError, Result};
 
 #[derive(Debug, Default)]
 pub struct HeifReader {
@@ -17,56 +16,49 @@ pub struct HeifReader {
 }
 
 impl HeifReader {
-    pub fn parse(&mut self, file_path: &str) -> Result<&mut Self> {
+    pub fn new(file_path: &str) -> Result<Self> {
         let mut file = File::open(file_path).map_err(|_| HeifError::FileOpen)?;
         let mut stream = BitStream::from(&mut file)?;
-        let mut ftyp_found = false;
-        let mut meta_found = false;
-        let mut movie_found = false;
-
-        self.metabox_map.clear();
-        // let mut metabox_map = HashMap::new();
-        // let mut movie_box = Option::<MovieBox>::None;
+        let mut ftyp = Option::<FileTypeBox>::None;
+        let mut metabox_map = HashMap::new();
+        let mut movie_box = Option::<MovieBox>::None;
 
         while !stream.is_eof() {
-            let header = BoxHeader::new(&mut stream)?;
-            if header.box_type == "ftyp" {
-                if ftyp_found {
+            let header = BoxHeader::from(&mut stream)?;
+            let box_type = header.box_type();
+            if box_type == "ftyp" {
+                if ftyp.is_some() {
                     return Err(HeifError::InvalidFormat);
                 }
-                ftyp_found = true;
                 let mut ex = stream.extract_from(&header)?;
-                self.ftyp.parse(&mut ex, header)?;
-            } else if header.box_type == "meta" {
-                if meta_found {
+                ftyp = Some(FileTypeBox::new(&mut ex, header)?);
+            } else if box_type == "meta" {
+                if !metabox_map.is_empty() {
                     return Err(HeifError::InvalidFormat);
                 }
-                meta_found = true;
                 let mut ex = stream.extract_from(&header)?;
-                self.metabox_map.insert(0, MetaBox::new(&mut ex, header)?);
-            } else if header.box_type == "moov" {
-                if movie_found {
+                metabox_map.insert(0, MetaBox::new(&mut ex, header)?);
+            } else if box_type == "moov" {
+                if movie_box.is_some() {
                     return Err(HeifError::InvalidFormat);
                 }
-                movie_found = true;
                 let mut ex = stream.extract_from(&header)?;
-            // movie_box = Some(MovieBox::new(&mut ex, header)?);
-            } else if header.box_type == "mdat"
-                || header.box_type == "free"
-                || header.box_type == "skip"
-            {
-                println!(">>SKIPPING {:?}", header);
+                movie_box = Some(MovieBox::new(&mut ex, header)?);
+            } else if box_type == "mdat" || box_type == "free" || box_type == "skip" {
+                println!(">>SKIPPING {}", box_type.to_string());
                 stream.skip_bytes(header.body_size() as usize)?;
             } else {
-                println!("skipping unknown type {}", header.box_type);
+                println!("unknown type {}", box_type.to_string());
                 stream.skip_bytes(header.body_size() as usize)?;
             }
         }
-        if !ftyp_found || (!meta_found && !movie_found) {
+        if ftyp.is_none() || (metabox_map.is_empty() && movie_box.is_none()) {
             return Err(HeifError::InvalidFormat);
         }
-        println!("\n\n{:?}", self);
-        Ok(self)
+        Ok(Self {
+            ftyp: ftyp.unwrap(),
+            metabox_map,
+        })
     }
 }
 

@@ -1,19 +1,34 @@
-use crate::_box::meta::iprp::ItemProperty;
-use crate::_box::BoxHeader;
-use crate::bit::Stream;
-use crate::Result;
+use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::meta::iprp::ItemProperty;
+use crate::bit::{Byte4, Stream};
+use crate::{HeifError, Result};
+
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct HevcConfigurationBox {
-    pub box_header: BoxHeader,
-    pub hevc_config: HevcDecoderConfigurationRecord,
+    box_header: BoxHeader,
+    hevc_config: HevcDecoderConfigurationRecord,
+}
+
+impl Default for HevcConfigurationBox {
+    fn default() -> Self {
+        Self::new(HevcDecoderConfigurationRecord::new())
+    }
 }
 
 impl HevcConfigurationBox {
-    pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn new(hevc_config: HevcDecoderConfigurationRecord) -> Self {
+        Self {
+            box_header: BoxHeader::new(Byte4::from_str("hvcC").unwrap()),
+            hevc_config,
+        }
+    }
+
+    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         Ok(Self {
             box_header,
-            hevc_config: HevcDecoderConfigurationRecord::new(stream)?,
+            hevc_config: HevcDecoderConfigurationRecord::from(stream)?,
         })
     }
 }
@@ -49,7 +64,36 @@ pub struct HevcDecoderConfigurationRecord {
 }
 
 impl HevcDecoderConfigurationRecord {
-    fn new<T: Stream>(stream: &mut T) -> Result<Self> {
+    fn new() -> Self {
+        Self {
+            configuration_version: 1,
+            general_profile_space: 0,
+            general_tier_flag: 0,
+            general_profile_idc: 0,
+            general_profile_compatibility_flags: 0,
+            general_constraint_indicator_flags: [0; 6],
+            general_level_idc: 0,
+            min_spatial_segmentation_idc: 0,
+            parallelism_type: 0,
+            chroma_format: 0,
+            pic_width_in_luma_samples: 0,
+            pic_height_in_luma_samples: 0,
+            conf_win_left_offset: 0,
+            conf_win_right_offset: 0,
+            conf_win_top_offset: 0,
+            conf_win_bottom_offset: 0,
+            bit_depth_luma_minus8: 0,
+            bit_depth_chroma_minus8: 0,
+            avg_frame_rate: 0,
+            constant_frame_rate: 0,
+            num_temporal_layers: 0,
+            temporal_id_nested: 0,
+            length_size_minus1: 0,
+            nal_array: Vec::new(),
+        }
+    }
+
+    fn from<T: Stream>(stream: &mut T) -> Result<Self> {
         let configuration_version = stream.read_byte()?;
         let general_profile_space = stream.read_bits(2)? as u8;
         let general_tier_flag = stream.read_bits(1)? as u8;

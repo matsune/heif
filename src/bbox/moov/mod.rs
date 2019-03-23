@@ -1,9 +1,9 @@
 pub mod media;
 pub mod track;
 
-use crate::Result;
-use crate::_box::{BoxHeader, FullBoxHeader};
+use crate::bbox::header::{BoxHeader, FullBoxHeader};
 use crate::bit::Stream;
+use crate::Result;
 use track::TrackBox;
 
 #[derive(Debug)]

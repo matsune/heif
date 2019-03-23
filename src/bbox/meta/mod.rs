@@ -11,7 +11,7 @@ pub mod pitm;
 
 use std::collections::HashMap;
 
-use crate::_box::{BoxHeader, FullBoxHeader};
+use crate::bbox::header::{BoxHeader, FullBoxHeader};
 use crate::bit::Stream;
 use crate::reader::ItemFeature;
 use crate::Result;
@@ -45,40 +45,42 @@ pub struct MetaBox {
 impl MetaBox {
     pub fn new<T: Stream>(stream: &mut T, header: BoxHeader) -> Result<Self> {
         let mut s = Self::default();
-        s.full_box_header = FullBoxHeader::new(stream, header)?;
+        s.full_box_header = FullBoxHeader::from(stream, header)?;
         s.parse(stream)
     }
 
     fn parse<T: Stream>(mut self, stream: &mut T) -> Result<Self> {
         while !stream.is_eof() {
-            let child_box_header = BoxHeader::new(stream)?;
+            let child_box_header = BoxHeader::from(stream)?;
             let mut ex = stream.extract_from(&child_box_header)?;
-            match child_box_header.box_type.as_str() {
-                "hdlr" => self.handler_box = Some(HandlerBox::new(&mut ex, child_box_header)?),
+            match child_box_header.box_type().to_string().as_str() {
+                "hdlr" => self.handler_box = Some(HandlerBox::from(&mut ex, child_box_header)?),
                 "pitm" => {
-                    self.primary_item_box = Some(PrimaryItemBox::new(&mut ex, child_box_header)?)
+                    self.primary_item_box = Some(PrimaryItemBox::from(&mut ex, child_box_header)?)
                 }
                 "iloc" => {
-                    self.item_location_box = Some(ItemLocationBox::new(&mut ex, child_box_header)?)
+                    self.item_location_box = Some(ItemLocationBox::from(&mut ex, child_box_header)?)
                 }
-                "iinf" => self.item_info_box = Some(ItemInfoBox::new(&mut ex, child_box_header)?),
+                "iinf" => self.item_info_box = Some(ItemInfoBox::from(&mut ex, child_box_header)?),
                 "iref" => {
                     self.item_reference_box =
-                        Some(ItemReferenceBox::new(&mut ex, child_box_header)?)
+                        Some(ItemReferenceBox::from(&mut ex, child_box_header)?)
                 }
                 "iprp" => {
                     self.item_properties_box =
-                        Some(ItemPropertiesBox::new(&mut ex, child_box_header)?)
+                        Some(ItemPropertiesBox::from(&mut ex, child_box_header)?)
                 }
-                "grpl" => self.group_list_box = Some(GroupListBox::new(&mut ex, child_box_header)?),
+                "grpl" => {
+                    self.group_list_box = Some(GroupListBox::from(&mut ex, child_box_header)?)
+                }
                 "dinf" => {
                     self.data_information_box =
-                        Some(DataInformationBox::new(&mut ex, child_box_header)?)
+                        Some(DataInformationBox::from(&mut ex, child_box_header)?)
                 }
-                "idat" => self.item_data_box = Some(ItemDataBox::new(&mut ex, child_box_header)?),
+                "idat" => self.item_data_box = Some(ItemDataBox::from(&mut ex, child_box_header)?),
                 "ipro" => {
                     self.item_protection_box =
-                        Some(ItemProtectionBox::new(&mut ex, child_box_header)?)
+                        Some(ItemProtectionBox::from(&mut ex, child_box_header)?)
                 }
                 _ => {} //skip
             };
