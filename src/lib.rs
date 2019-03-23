@@ -9,6 +9,7 @@ pub enum HeifError {
     FileOpen,
     FileRead,
     InvalidFormat,
+    InvalidItemID,
     EOF,
 }
 
@@ -18,6 +19,7 @@ impl HeifError {
             HeifError::FileOpen => "FileOpen",
             HeifError::FileRead => "FileRead",
             HeifError::InvalidFormat => "InvalidFormat",
+            HeifError::InvalidItemID => "InvalidItemID",
             HeifError::EOF => "EOF",
         }
     }

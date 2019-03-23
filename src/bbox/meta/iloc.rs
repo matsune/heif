@@ -21,8 +21,8 @@ impl Default for ItemLocationExtent {
     }
 }
 
-#[derive(Debug)]
-enum ConstructionMethod {
+#[derive(Debug, PartialEq)]
+pub enum ConstructionMethod {
     FileOffset,
     IdatOffset,
     ItemOffset,
@@ -59,14 +59,56 @@ impl Default for ItemLocation {
     }
 }
 
+impl ItemLocation {
+    pub fn item_id(&self) -> u32 {
+        self.item_id
+    }
+
+    pub fn set_item_id(&mut self, id: u32) {
+        self.item_id = id;
+    }
+
+    pub fn method(&self) -> &ConstructionMethod {
+        &self.method
+    }
+
+    pub fn set_method(&mut self, m: ConstructionMethod) {
+        self.method = m;
+    }
+
+    pub fn data_ref_index(&self) -> u16 {
+        self.data_ref_index
+    }
+
+    pub fn set_data_ref_index(&mut self, idx: u16) {
+        self.data_ref_index = idx;
+    }
+
+    pub fn base_offset(&self) -> usize {
+        self.base_offset
+    }
+
+    pub fn set_base_offset(&mut self, n: usize) {
+        self.base_offset = n;
+    }
+
+    pub fn extent_list(&self) -> &Vec<ItemLocationExtent> {
+        &self.extent_list
+    }
+
+    pub fn add_extent(&mut self, ex: ItemLocationExtent) {
+        self.extent_list.push(ex);
+    }
+}
+
 #[derive(Debug)]
 pub struct ItemLocationBox {
-    pub full_box_header: FullBoxHeader,
-    pub offset_size: u8,
-    pub length_size: u8,
-    pub base_offset_size: u8,
-    pub index_size: u8,
-    pub locations: Vec<ItemLocation>,
+    full_box_header: FullBoxHeader,
+    offset_size: u8,
+    length_size: u8,
+    base_offset_size: u8,
+    index_size: u8,
+    locations: Vec<ItemLocation>,
 }
 
 impl Default for ItemLocationBox {
@@ -142,5 +184,44 @@ impl ItemLocationBox {
             index_size,
             locations,
         })
+    }
+
+    pub fn full_box_header(&self) -> &FullBoxHeader {
+        &self.full_box_header
+    }
+
+    pub fn offset_size(&self) -> u8 {
+        self.offset_size
+    }
+
+    pub fn set_offset_size(&mut self, n: u8) {
+        self.offset_size = n;
+    }
+
+    pub fn length_size(&self) -> u8 {
+        self.length_size
+    }
+
+    pub fn set_length_size(&mut self, n: u8) {
+        self.length_size = n;
+    }
+
+    pub fn base_offset_size(&self) -> u8 {
+        self.base_offset_size
+    }
+
+    pub fn set_base_offset_size(&mut self, n: u8) {
+        self.base_offset_size = n;
+    }
+
+    pub fn locations_count(&self) -> usize {
+        self.locations.len()
+    }
+
+    pub fn add_location(&mut self, loc: ItemLocation) {
+        if *loc.method() != ConstructionMethod::FileOffset {
+            self.full_box_header.set_version(1);
+        }
+        self.locations.push(loc);
     }
 }

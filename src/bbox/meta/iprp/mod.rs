@@ -52,6 +52,10 @@ impl ItemPropertiesBox {
             association_boxes,
         })
     }
+
+    pub fn box_header(&self) -> &BoxHeader {
+        &self.box_header
+    }
 }
 
 pub trait ItemProperty {}
@@ -104,9 +108,16 @@ impl ItemPropertyContainer {
             properties,
         })
     }
+
+    pub fn property_at(&self, index: usize) -> Option<&Box<ItemProperty>> {
+        self.properties.get(index)
+    }
+
+    pub fn add_property(&mut self, prop: Box<ItemProperty>) {
+        self.properties.push(prop);
+    }
 }
 
-type AssociationID = u32;
 type AssociationEntries = Vec<AssociationEntry>;
 
 #[derive(Debug)]
@@ -118,7 +129,7 @@ pub struct AssociationEntry {
 #[derive(Debug)]
 pub struct ItemPropertyAssociation {
     full_box_header: FullBoxHeader,
-    associations: HashMap<AssociationID, AssociationEntries>,
+    associations: HashMap<u32, AssociationEntries>,
 }
 
 const PROPERTY_INDEX_WIDTH_LARGE: usize = 15;
@@ -165,5 +176,26 @@ impl ItemPropertyAssociation {
             full_box_header,
             associations,
         })
+    }
+
+    pub fn add_entry(&mut self, item_id: u32, index: u16, is_essential: bool) {
+        let entries = vec![AssociationEntry {
+            is_essential,
+            index,
+        }];
+        self.associations.insert(item_id, entries);
+        if self.full_box_header.version() == 0 && item_id > std::u16::MAX.into() {
+            self.full_box_header.set_version(1);
+        }
+        if (self.full_box_header.flags() & 1) == 0 {
+            if index > 127 {
+                self.full_box_header
+                    .set_flags(self.full_box_header.flags() | 1);
+            }
+        }
+    }
+
+    pub fn association_entries_at(&self, item_id: u32) -> Option<&AssociationEntries> {
+        self.associations.get(&item_id)
     }
 }

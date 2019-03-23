@@ -34,13 +34,13 @@ impl DataInformationBox {
         })
     }
 
-    // TODO: add_entry
-    // pub fn add_entry<T: DataEntry>(&mut self, entry: T) {
-    //     if self.data_reference_box.is_none() {
-    //         self.data_reference_box = Some(DataReferenceBox::default())
-    //     }
-    //     self.data_reference_box.add
-    // }
+    pub fn box_header(&self) -> &BoxHeader {
+        &self.box_header
+    }
+
+    pub fn add_entry(&mut self, entry: Box<DataEntry>) {
+        self.data_reference_box.add_entry(entry);
+    }
 }
 
 pub struct DataReferenceBox {
@@ -95,9 +95,13 @@ impl DataReferenceBox {
         Ok(self)
     }
 
-    // pub fn add_entry<T: DataEntry>(&mut self, entry: T) {
-    //     self.data_entries.push(Box::new(entry));
-    // }
+    pub fn full_box_header(&self) -> &FullBoxHeader {
+        &self.full_box_header
+    }
+
+    pub fn add_entry(&mut self, entry: Box<DataEntry>) {
+        self.data_entries.push(entry);
+    }
 }
 
 pub trait DataEntry {}
@@ -114,6 +118,10 @@ impl DataEntryBox {
             full_box_header: FullBoxHeader::new(box_type, version, flags),
             location: String::new(),
         }
+    }
+
+    pub fn full_box_header(&self) -> &FullBoxHeader {
+        &self.full_box_header
     }
 
     pub fn location(&self) -> &String {
@@ -153,6 +161,10 @@ impl DataEntryUrnBox {
             name,
             location,
         })
+    }
+
+    pub fn full_box_header(&self) -> &FullBoxHeader {
+        &self.full_box_header
     }
 
     pub fn location(&self) -> &String {
@@ -198,6 +210,10 @@ impl DataEntryUrlBox {
             full_box_header,
             location,
         })
+    }
+
+    pub fn full_box_header(&self) -> &FullBoxHeader {
+        &self.full_box_header
     }
 
     pub fn location(&self) -> &String {

@@ -26,4 +26,19 @@ impl ItemDataBox {
             data: stream.read_bytes(stream.num_bytes_left())?.to_vec(),
         })
     }
+
+    pub fn box_header(&self) -> &BoxHeader {
+        &self.box_header
+    }
+
+    pub fn read(&self, offset: usize, length: usize) -> Option<&[u8]> {
+        if (offset + length) > self.data.len() {
+            return None;
+        }
+        Some(&self.data[offset..(offset + length)])
+    }
+
+    pub fn add_data(&mut self, data: &mut Vec<u8>) {
+        self.data.append(data);
+    }
 }

@@ -34,6 +34,22 @@ impl ItemProtectionBox {
             protection_info,
         })
     }
+
+    pub fn full_box_header(&self) -> &FullBoxHeader {
+        &self.full_box_header
+    }
+
+    pub fn protection_count(&self) -> usize {
+        self.protection_info.len()
+    }
+
+    pub fn entry_at(&self, index: usize) -> Option<&ProtectionSchemeInfoBox> {
+        self.protection_info.get(index)
+    }
+
+    pub fn add_entry(&mut self, entry: ProtectionSchemeInfoBox) {
+        self.protection_info.push(entry)
+    }
 }
 
 #[derive(Debug)]

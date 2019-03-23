@@ -1,6 +1,6 @@
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
 use crate::bit::{Byte4, Stream};
-use crate::Result;
+use crate::{HeifError, Result};
 
 use std::str::FromStr;
 
@@ -20,6 +20,10 @@ impl Default for ItemReferenceBox {
 }
 
 impl ItemReferenceBox {
+    fn full_box_header(&self) -> &FullBoxHeader {
+        &self.full_box_header
+    }
+
     pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let is_large = full_box_header.version() > 0;
@@ -34,6 +38,37 @@ impl ItemReferenceBox {
             full_box_header,
             reference_list,
         })
+    }
+
+    pub fn add_item_ref(&mut self, ref_box: SingleItemTypeReferenceBox) {
+        self.reference_list.push(ref_box);
+    }
+
+    pub fn item_ref_by_type(&self, box_type: Byte4) -> Option<&SingleItemTypeReferenceBox> {
+        self.reference_list
+            .iter()
+            .find(|r| *r.box_header().box_type() == box_type)
+    }
+
+    pub fn add(&mut self, box_type: Byte4, from_id: u32, to_id: u32) -> Result<()> {
+        let is_large = self.full_box_header.version() != 0;
+        if ((from_id > std::u16::MAX.into() || to_id > std::u16::MAX.into()) && !is_large) {
+            return Err(HeifError::InvalidItemID);
+        }
+        if let Some(item_ref) = self
+            .reference_list
+            .iter_mut()
+            .find(|i| *i.box_header().box_type() == box_type && i.from_item_id() == from_id)
+        {
+            item_ref.add_to_item_id(to_id);
+        } else {
+            let mut item_ref = SingleItemTypeReferenceBox::new(is_large);
+            item_ref.set_reference_type(box_type);
+            item_ref.set_from_item_id(from_id);
+            item_ref.add_to_item_id(to_id);
+            self.reference_list.push(item_ref);
+        }
+        Ok(())
     }
 }
 
@@ -80,6 +115,10 @@ impl SingleItemTypeReferenceBox {
             to_item_ids,
             is_large,
         })
+    }
+
+    fn box_header(&self) -> &BoxHeader {
+        &self.box_header
     }
 
     pub fn set_reference_type(&mut self, r_type: Byte4) {

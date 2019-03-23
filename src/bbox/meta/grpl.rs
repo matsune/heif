@@ -33,6 +33,10 @@ impl GroupListBox {
         })
     }
 
+    pub fn box_header(&self) -> &BoxHeader {
+        &self.box_header
+    }
+
     pub fn entity_to_group_box_vector(&self) -> &Vec<EntityToGroupBox> {
         &self.entity_to_group_box_vector
     }
@@ -63,6 +67,10 @@ impl EntityToGroupBox {
             group_id,
             entity_ids,
         })
+    }
+
+    pub fn full_box_header(&self) -> &FullBoxHeader {
+        &self.full_box_header
     }
 
     pub fn group_id(&self) -> &u32 {

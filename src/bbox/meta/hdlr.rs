@@ -35,6 +35,10 @@ impl HandlerBox {
         })
     }
 
+    pub fn full_box_header(&self) -> &FullBoxHeader {
+        &self.full_box_header
+    }
+
     pub fn handler_type(&self) -> &Byte4 {
         &self.handler_type
     }
