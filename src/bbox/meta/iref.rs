@@ -20,13 +20,13 @@ impl Default for ItemReferenceBox {
 }
 
 impl ItemReferenceBox {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let is_large = full_box_header.version() > 0;
         let mut reference_list = Vec::new();
         while !stream.is_eof() {
-            let box_header = BoxHeader::from(stream)?;
-            reference_list.push(SingleItemTypeReferenceBox::from(
+            let box_header = BoxHeader::from_stream(stream)?;
+            reference_list.push(SingleItemTypeReferenceBox::from_stream_is_large(
                 stream, box_header, is_large,
             )?);
         }
@@ -55,7 +55,11 @@ impl SingleItemTypeReferenceBox {
         }
     }
 
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader, is_large: bool) -> Result<Self> {
+    pub fn from_stream_is_large<T: Stream>(
+        stream: &mut T,
+        box_header: BoxHeader,
+        is_large: bool,
+    ) -> Result<Self> {
         let from_item_id = if is_large {
             stream.read_4bytes()?.to_u32()
         } else {

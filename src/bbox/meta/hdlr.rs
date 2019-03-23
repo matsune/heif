@@ -22,8 +22,8 @@ impl Default for HandlerBox {
 }
 
 impl HandlerBox {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         stream.skip_bytes(4)?;
         let handler_type = stream.read_4bytes()?;
         stream.skip_bytes(12)?;

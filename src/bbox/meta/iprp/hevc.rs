@@ -25,10 +25,10 @@ impl HevcConfigurationBox {
         }
     }
 
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         Ok(Self {
             box_header,
-            hevc_config: HevcDecoderConfigurationRecord::from(stream)?,
+            hevc_config: HevcDecoderConfigurationRecord::from_stream(stream)?,
         })
     }
 }
@@ -95,7 +95,7 @@ impl Default for HevcDecoderConfigurationRecord {
 }
 
 impl HevcDecoderConfigurationRecord {
-    fn from<T: Stream>(stream: &mut T) -> Result<Self> {
+    fn from_stream<T: Stream>(stream: &mut T) -> Result<Self> {
         let configuration_version = stream.read_byte()?;
         let general_profile_space = stream.read_bits(2)? as u8;
         let general_tier_flag = stream.read_bits(1)? as u8;

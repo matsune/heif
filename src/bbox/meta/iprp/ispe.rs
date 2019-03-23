@@ -27,8 +27,8 @@ impl ImageSpatialExtentsProperty {
         }
     }
 
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let width = stream.read_4bytes()?.to_u32();
         let height = stream.read_4bytes()?.to_u32();
         Ok(Self {

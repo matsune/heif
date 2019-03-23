@@ -20,7 +20,7 @@ impl Default for ItemDataBox {
 }
 
 impl ItemDataBox {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         Ok(Self {
             box_header,
             data: stream.read_bytes(stream.num_bytes_left())?.to_vec(),

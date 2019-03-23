@@ -29,19 +29,22 @@ impl Default for ItemPropertiesBox {
 }
 
 impl ItemPropertiesBox {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let box_header = box_header;
-        let container_box_header = BoxHeader::from(stream)?;
+        let container_box_header = BoxHeader::from_stream(stream)?;
         let mut ex = stream.extract_from(&container_box_header)?;
-        let container = ItemPropertyContainer::from(&mut ex, container_box_header)?;
+        let container = ItemPropertyContainer::from_stream_header(&mut ex, container_box_header)?;
         let mut association_boxes = Vec::new();
         while !stream.is_eof() {
-            let sub_box_header = BoxHeader::from(stream)?;
+            let sub_box_header = BoxHeader::from_stream(stream)?;
             if sub_box_header.box_type() != "ipma" {
                 return Err(HeifError::InvalidFormat);
             }
             let mut ex = stream.extract_from(&sub_box_header)?;
-            association_boxes.push(ItemPropertyAssociation::from(&mut ex, sub_box_header)?);
+            association_boxes.push(ItemPropertyAssociation::from_stream_header(
+                &mut ex,
+                sub_box_header,
+            )?);
         }
         Ok(Self {
             box_header,
@@ -74,17 +77,23 @@ impl Default for ItemPropertyContainer {
 }
 
 impl ItemPropertyContainer {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         if box_header.box_type() != "ipco" {
             // TODO: ?
         }
         let mut properties: Vec<Box<ItemProperty>> = Vec::new();
         while !stream.is_eof() {
-            let sub_box_header = BoxHeader::from(stream)?;
+            let sub_box_header = BoxHeader::from_stream(stream)?;
             let mut ex = stream.extract_from(&sub_box_header)?;
             let property: Box<ItemProperty> = match sub_box_header.box_type().to_string().as_str() {
-                "hvcC" => Box::new(HevcConfigurationBox::from(&mut ex, sub_box_header)?),
-                "ispe" => Box::new(ImageSpatialExtentsProperty::from(&mut ex, sub_box_header)?),
+                "hvcC" => Box::new(HevcConfigurationBox::from_stream_header(
+                    &mut ex,
+                    sub_box_header,
+                )?),
+                "ispe" => Box::new(ImageSpatialExtentsProperty::from_stream_header(
+                    &mut ex,
+                    sub_box_header,
+                )?),
                 // TODO:
                 _ => unimplemented!("itemprop {}", sub_box_header.box_type().to_string()),
             };
@@ -125,8 +134,8 @@ impl Default for ItemPropertyAssociation {
 }
 
 impl ItemPropertyAssociation {
-    fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+    fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let mut associations = HashMap::new();
         let entry_count = stream.read_4bytes()?.to_u32();
         for _ in 0..entry_count {

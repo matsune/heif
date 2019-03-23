@@ -20,14 +20,14 @@ impl Default for ItemProtectionBox {
 }
 
 impl ItemProtectionBox {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let mut protection_info = Vec::new();
         let box_count = stream.read_2bytes()?.to_u16();
         for _ in 0..box_count {
-            let child_box_header = BoxHeader::from(stream)?;
+            let child_box_header = BoxHeader::from_stream(stream)?;
             let mut ex = stream.extract_from(&child_box_header)?;
-            protection_info.push(ProtectionSchemeInfoBox::from(&mut ex)?);
+            protection_info.push(ProtectionSchemeInfoBox::from_stream(&mut ex)?);
         }
         Ok(Self {
             full_box_header,
@@ -48,7 +48,7 @@ impl Default for ProtectionSchemeInfoBox {
 }
 
 impl ProtectionSchemeInfoBox {
-    pub fn from<T: Stream>(stream: &mut T) -> Result<Self> {
+    pub fn from_stream<T: Stream>(stream: &mut T) -> Result<Self> {
         Ok(Self {
             data: stream.read_bytes(stream.num_bytes_left())?.to_vec(),
         })

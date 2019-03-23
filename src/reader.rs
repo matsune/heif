@@ -24,7 +24,7 @@ impl HeifReader {
         let mut movie_box = Option::<MovieBox>::None;
 
         while !stream.is_eof() {
-            let header = BoxHeader::from(&mut stream)?;
+            let header = BoxHeader::from_stream(&mut stream)?;
             let box_type = header.box_type();
             if box_type == "ftyp" {
                 if ftyp.is_some() {
@@ -37,7 +37,7 @@ impl HeifReader {
                     return Err(HeifError::InvalidFormat);
                 }
                 let mut ex = stream.extract_from(&header)?;
-                metabox_map.insert(0, MetaBox::new(&mut ex, header)?);
+                metabox_map.insert(0, MetaBox::from_stream_header(&mut ex, header)?);
             } else if box_type == "moov" {
                 if movie_box.is_some() {
                     return Err(HeifError::InvalidFormat);

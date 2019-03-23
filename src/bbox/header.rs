@@ -29,7 +29,7 @@ impl BoxHeader {
         }
     }
 
-    pub fn from<T: Stream>(stream: &mut T) -> Result<BoxHeader> {
+    pub fn from_stream<T: Stream>(stream: &mut T) -> Result<BoxHeader> {
         let mut box_size = stream.read_4bytes()?.to_u64();
         let box_type = stream.read_4bytes()?;
         let mut is_large = false;
@@ -120,7 +120,7 @@ impl FullBoxHeader {
         }
     }
 
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let word = stream.read_4bytes()?;
         let version = word.0;
         let flags = (u32::from(word.1) << 16) + (u32::from(word.2) << 8) + u32::from(word.3);
@@ -214,7 +214,7 @@ mod tests {
             0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x69, 0x66, 0x31, 0x00, 0x00,
             0x00, 0x00, 0x6D, 0x69, 0x66, 0x31, 0x68, 0x65, 0x69, 0x63,
         ]);
-        let header = BoxHeader::from(&mut stream).unwrap();
+        let header = BoxHeader::from_stream(&mut stream).unwrap();
         assert_eq!(header.box_size, 24);
         assert_eq!(header.box_type, "ftyp");
         assert_eq!(header.user_type, Vec::new());

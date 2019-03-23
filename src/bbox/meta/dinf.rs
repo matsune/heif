@@ -20,13 +20,13 @@ impl Default for DataInformationBox {
 }
 
 impl DataInformationBox {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let data_reference_box = if stream.is_eof() {
             DataReferenceBox::default()
         } else {
             let mut ex = stream.extract_from(&box_header)?;
-            let child_box_header = BoxHeader::from(&mut ex)?;
-            DataReferenceBox::from(&mut ex, child_box_header)?
+            let child_box_header = BoxHeader::from_stream(&mut ex)?;
+            DataReferenceBox::from_stream_header(&mut ex, child_box_header)?
         };
         Ok(Self {
             box_header,
@@ -64,9 +64,9 @@ impl Default for DataReferenceBox {
 }
 
 impl DataReferenceBox {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         Self {
-            full_box_header: FullBoxHeader::from(stream, box_header)?,
+            full_box_header: FullBoxHeader::from_stream_header(stream, box_header)?,
             data_entries: Vec::new(),
         }
         .parse(stream)
@@ -76,12 +76,18 @@ impl DataReferenceBox {
         let entry_count = stream.read_4bytes()?.to_u32();
         self.data_entries.clear();
         for _ in 0..entry_count {
-            let child_box_header = BoxHeader::from(stream)?;
+            let child_box_header = BoxHeader::from_stream(stream)?;
             let mut ex = stream.extract_from(&child_box_header)?;
             let data_entry: Box<DataEntry> = match child_box_header.box_type().to_string().as_str()
             {
-                "urn " => Box::new(DataEntryUrnBox::from(&mut ex, child_box_header)?),
-                "url " => Box::new(DataEntryUrlBox::from(&mut ex, child_box_header)?),
+                "urn " => Box::new(DataEntryUrnBox::from_stream_header(
+                    &mut ex,
+                    child_box_header,
+                )?),
+                "url " => Box::new(DataEntryUrlBox::from_stream_header(
+                    &mut ex,
+                    child_box_header,
+                )?),
                 _ => return Err(HeifError::InvalidFormat),
             };
             self.data_entries.push(data_entry);
@@ -138,8 +144,8 @@ impl Default for DataEntryUrnBox {
 }
 
 impl DataEntryUrnBox {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let name = stream.read_zero_term_string();
         let location = stream.read_zero_term_string();
         Ok(Self {
@@ -182,8 +188,8 @@ impl DataEntryUrlBox {
         }
     }
 
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let mut location = String::new();
         if (full_box_header.flags() & 1) != 0 {
             location = stream.read_zero_term_string();

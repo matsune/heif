@@ -20,11 +20,11 @@ impl Default for GroupListBox {
 }
 
 impl GroupListBox {
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let mut entity_to_group_box_vector = Vec::new();
         while !stream.is_eof() {
             let mut ex = stream.extract_from(&box_header)?;
-            let child_box_header = BoxHeader::from(&mut ex)?;
+            let child_box_header = BoxHeader::from_stream(&mut ex)?;
             entity_to_group_box_vector.push(EntityToGroupBox::new(&mut ex, child_box_header)?);
         }
         Ok(Self {
@@ -51,7 +51,7 @@ pub struct EntityToGroupBox {
 
 impl EntityToGroupBox {
     pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let group_id = stream.read_4bytes()?.to_u32();
         let entity_count = stream.read_4bytes()?.to_u32();
         let mut entity_ids = Vec::new();

@@ -24,8 +24,8 @@ impl ItemInfoBox {
         }
     }
 
-    pub fn from<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from(stream, box_header)?;
+    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let entry_count = if full_box_header.version() == 0 {
             stream.read_2bytes()?.to_u32()
         } else {
@@ -33,7 +33,7 @@ impl ItemInfoBox {
         };
         let mut item_info_list = Vec::new();
         for _ in 0..entry_count {
-            let entry_box_header = BoxHeader::from(stream)?;
+            let entry_box_header = BoxHeader::from_stream(stream)?;
             item_info_list.push(ItemInfoEntry::new(stream, entry_box_header)?);
         }
         Ok(Self {
@@ -82,7 +82,7 @@ pub struct ItemInfoEntry {
 impl ItemInfoEntry {
     pub fn new<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let mut s = Self::default();
-        s.full_box_header = FullBoxHeader::from(stream, box_header)?;
+        s.full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         s.parse(stream)
     }
 
