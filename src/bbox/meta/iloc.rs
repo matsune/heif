@@ -5,7 +5,7 @@ use crate::Result;
 use std::str::FromStr;
 
 #[derive(Debug)]
-struct ItemLocationExtent {
+pub struct ItemLocationExtent {
     extent_index: usize,
     extent_offset: usize,
     extent_length: usize,
@@ -29,7 +29,7 @@ pub enum ConstructionMethod {
 }
 
 impl ConstructionMethod {
-    fn new(n: usize) -> Self {
+    pub fn new(n: usize) -> Self {
         match n {
             1 => ConstructionMethod::IdatOffset,
             2 => ConstructionMethod::ItemOffset,

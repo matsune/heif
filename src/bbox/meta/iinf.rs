@@ -132,8 +132,8 @@ impl ItemInfoEntry {
         self.item_id = item_id;
     }
 
-    pub fn item_protection_index(&self) -> &u16 {
-        &self.item_protection_index
+    pub fn item_protection_index(&self) -> u16 {
+        self.item_protection_index
     }
 
     pub fn set_item_protection_index(&mut self, idx: u16) {
