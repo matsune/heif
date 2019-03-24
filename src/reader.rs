@@ -39,9 +39,10 @@ impl HeifReader {
                 }
                 let mut ex = stream.extract_from(&header)?;
                 let metabox = meta::MetaBox::from_stream_header(&mut ex, header)?;
-                // TODO
-                file_properties.root_meta_box_properties =
-                    meta::extract_metabox_properties(&metabox);
+                let mut root_meta_box_properties = meta::extract_metabox_properties(&metabox);
+                root_meta_box_properties.context_id = 0;
+                file_properties.root_meta_box_properties = root_meta_box_properties;
+                // TODO: meta_box_info.insert(0, extract_items(metabox, 0)) 
                 metabox_map.insert(0, metabox);
             } else if box_type == "moov" {
                 if movie_box.is_some() {

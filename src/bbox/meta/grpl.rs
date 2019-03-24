@@ -73,8 +73,8 @@ impl EntityToGroupBox {
         &self.full_box_header
     }
 
-    pub fn group_id(&self) -> &u32 {
-        &self.group_id
+    pub fn group_id(&self) -> u32 {
+        self.group_id
     }
 
     pub fn set_group_id(&mut self, id: u32) {

@@ -41,7 +41,7 @@ impl FromStr for Byte2 {
     }
 }
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct Byte4(pub u8, pub u8, pub u8, pub u8);
 
 impl Byte4 {

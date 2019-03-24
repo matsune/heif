@@ -44,10 +44,11 @@ impl ItemReferenceBox {
         self.reference_list.push(ref_box);
     }
 
-    pub fn item_ref_by_type(&self, box_type: Byte4) -> Option<&SingleItemTypeReferenceBox> {
+    pub fn references_of_type(&self, box_type: Byte4) -> Vec<&SingleItemTypeReferenceBox> {
         self.reference_list
             .iter()
-            .find(|r| *r.box_header().box_type() == box_type)
+            .filter(|r| *r.box_header().box_type() == box_type)
+            .collect()
     }
 
     pub fn add(&mut self, box_type: Byte4, from_id: u32, to_id: u32) -> Result<()> {

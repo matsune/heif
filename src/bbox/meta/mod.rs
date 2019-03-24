@@ -210,10 +210,10 @@ pub type ItemFeaturesMap = HashMap<u32, ItemFeature>;
 
 #[derive(Debug, Default)]
 pub struct MetaBoxProperties {
-    context_id: u32,
-    meta_box_feature: MetaBoxFeature,
-    item_features_map: ItemFeaturesMap,
-    entity_groupings: Vec<EntityGrouping>,
+    pub context_id: u32,
+    pub meta_box_feature: MetaBoxFeature,
+    pub item_features_map: ItemFeaturesMap,
+    pub entity_groupings: Vec<EntityGrouping>,
 }
 
 #[derive(Debug, Default)]
@@ -307,12 +307,27 @@ pub struct EntityGrouping {
 }
 
 pub fn extract_metabox_properties(metabox: &MetaBox) -> MetaBoxProperties {
+    let item_features_map = extract_metabox_item_properties_map(metabox);
+    let entity_groupings = extract_metabox_entity_to_group_maps(metabox);
+    let meta_box_feature = extract_metabox_feature(&item_features_map, &entity_groupings);
     MetaBoxProperties {
         context_id: 0,
-        meta_box_feature: extract_metabox_feature(metabox),
-        item_features_map: extract_metabox_item_properties_map(metabox),
-        entity_groupings: Vec::new(),
+        meta_box_feature,
+        item_features_map,
+        entity_groupings,
     }
+}
+
+pub fn extract_metabox_entity_to_group_maps(metabox: &MetaBox) -> Vec<EntityGrouping> {
+    let mut groupings = Vec::new();
+    for group_box in metabox.group_list_box().entity_to_group_box_vector() {
+        groupings.push(EntityGrouping {
+            group_id: group_box.group_id(),
+            group_type: group_box.full_box_header().box_type().clone(),
+            entity_ids: group_box.entity_ids().to_vec(),
+        })
+    }
+    groupings
 }
 
 pub fn extract_metabox_item_properties_map(metabox: &MetaBox) -> HashMap<u32, ItemFeature> {
@@ -327,19 +342,124 @@ pub fn extract_metabox_item_properties_map(metabox: &MetaBox) -> HashMap<u32, It
         let mut item_features = ItemFeature::default();
         let item_type = item.item_type();
         if is_image_item_type(item_type) {
+            if item.item_protection_index() > 0 {
+                item_features.set_feature(ItemFeatureEnum::IsProtected);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("thmb").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::IsThumbnailImage);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("auxl").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::IsAuxiliaryImage);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("base").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::IsPreComputedDerivedImage);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("dimg").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::IsDerivedImage);
+            }
+            if !item_features.has_feature(&ItemFeatureEnum::IsThumbnailImage)
+                && !item_features.has_feature(&ItemFeatureEnum::IsAuxiliaryImage)
+            {
+                item_features.set_feature(ItemFeatureEnum::IsMasterImage);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("thmb").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::HasLinkedThumbnails);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("auxl").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::HasLinkedAuxiliaryImage);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("cdsc").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::HasLinkedMetadata);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("base").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::HasLinkedPreComputedDerivedImage);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("tbas").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::HasLinkedTiles);
+            }
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("dimg").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::HasLinkedDerivedImage);
+            }
 
+            if metabox.primary_item_box().item_id() == item_id {
+                item_features.set_feature(ItemFeatureEnum::IsPrimaryImage);
+                item_features.set_feature(ItemFeatureEnum::IsCoverImage);
+            }
+
+            if (item.full_box_header().flags() & 0x1) != 0 {
+                item_features.set_feature(ItemFeatureEnum::IsHiddenImage);
+            }
         } else {
             if item.item_protection_index() > 0 {
                 item_features.set_feature(ItemFeatureEnum::IsProtected);
             }
-            // TODO
+            if do_references_from_item_id_exist(metabox, item_id, Byte4::from_str("cdsc").unwrap())
+            {
+                item_features.set_feature(ItemFeatureEnum::IsMetadataItem);
+            }
+            if item_type == "Exif" {
+                item_features.set_feature(ItemFeatureEnum::IsExifItem);
+            } else if item_type == "mime" {
+                if item.content_type() == "application/rdf+xml" {
+                    item_features.set_feature(ItemFeatureEnum::IsXMPItem);
+                } else {
+                    item_features.set_feature(ItemFeatureEnum::IsMPEG7Item);
+                }
+            } else if item_type == "hvt1" {
+                item_features.set_feature(ItemFeatureEnum::IsTileImageItem);
+            }
         }
+        map.insert(item_id, item_features);
     }
     map
 }
 
-pub fn extract_metabox_feature(metabox: &MetaBox) -> MetaBoxFeature {
-    MetaBoxFeature::default()
+pub fn extract_metabox_feature(
+    image_features: &ItemFeaturesMap,
+    groupings: &Vec<EntityGrouping>,
+) -> MetaBoxFeature {
+    let mut meta_box_feature = MetaBoxFeature::default();
+    if groupings.len() > 0 {
+        meta_box_feature.set_feature(MetaBoxFeatureEnum::HasGroupLists);
+    }
+    if image_features.len() == 1 {
+        meta_box_feature.set_feature(MetaBoxFeatureEnum::IsSingleImage);
+    } else if image_features.len() > 1 {
+        meta_box_feature.set_feature(MetaBoxFeatureEnum::IsImageCollection);
+    }
+
+    for i in image_features {
+        let features = i.1;
+        if features.has_feature(&ItemFeatureEnum::IsMasterImage) {
+            meta_box_feature.set_feature(MetaBoxFeatureEnum::HasMasterImages);
+        }
+        if features.has_feature(&ItemFeatureEnum::IsThumbnailImage) {
+            meta_box_feature.set_feature(MetaBoxFeatureEnum::HasThumbnails);
+        }
+        if features.has_feature(&ItemFeatureEnum::IsAuxiliaryImage) {
+            meta_box_feature.set_feature(MetaBoxFeatureEnum::HasAuxiliaryImages);
+        }
+        if features.has_feature(&ItemFeatureEnum::IsDerivedImage) {
+            meta_box_feature.set_feature(MetaBoxFeatureEnum::HasDerivedImages);
+        }
+        if features.has_feature(&ItemFeatureEnum::IsPreComputedDerivedImage) {
+            meta_box_feature.set_feature(MetaBoxFeatureEnum::HasPreComputedDerivedImages);
+        }
+        if features.has_feature(&ItemFeatureEnum::IsHiddenImage) {
+            meta_box_feature.set_feature(MetaBoxFeatureEnum::HasHiddenImages);
+        }
+    }
+    meta_box_feature
 }
 
 pub fn is_image_item_type(item_type: &Byte4) -> bool {
@@ -350,4 +470,9 @@ pub fn is_image_item_type(item_type: &Byte4) -> bool {
         || item_type == "iovl"
         || item_type == "iden"
         || item_type == "jpeg"
+}
+
+fn do_references_from_item_id_exist(metabox: &MetaBox, item_id: u32, ref_type: Byte4) -> bool {
+    let refs = metabox.item_reference_box().references_of_type(ref_type);
+    refs.iter().find(|r| r.from_item_id() == item_id).is_some()
 }
