@@ -1,4 +1,5 @@
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
@@ -9,6 +10,13 @@ pub struct HandlerBox {
     full_box_header: FullBoxHeader,
     handler_type: Byte4,
     name: String,
+}
+
+impl BBox for HandlerBox {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
+    }
 }
 
 impl Default for HandlerBox {

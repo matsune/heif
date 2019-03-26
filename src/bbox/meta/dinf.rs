@@ -1,4 +1,5 @@
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::{HeifError, Result};
 
@@ -16,6 +17,13 @@ impl Default for DataInformationBox {
             box_header: BoxHeader::new(Byte4::from_str("dinf").unwrap()),
             data_reference_box: DataReferenceBox::default(),
         }
+    }
+}
+
+impl BBox for DataInformationBox {
+    type HeaderType = BoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.box_header
     }
 }
 
@@ -51,6 +59,13 @@ pub struct DataReferenceBox {
 impl std::fmt::Debug for DataReferenceBox {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "DataReferenceBox {:?}", self.full_box_header)
+    }
+}
+
+impl BBox for DataReferenceBox {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
     }
 }
 
@@ -112,6 +127,13 @@ pub struct DataEntryBox {
     location: String,
 }
 
+impl BBox for DataEntryBox {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
+    }
+}
+
 impl DataEntryBox {
     pub fn new(box_type: Byte4, version: u8, flags: u32) -> Self {
         Self {
@@ -148,6 +170,13 @@ impl Default for DataEntryUrnBox {
             location: String::new(),
             name: String::new(),
         }
+    }
+}
+
+impl BBox for DataEntryUrnBox {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
     }
 }
 
@@ -189,6 +218,13 @@ impl DataEntry for DataEntryUrnBox {}
 pub struct DataEntryUrlBox {
     full_box_header: FullBoxHeader,
     location: String,
+}
+
+impl BBox for DataEntryUrlBox {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
+    }
 }
 
 impl DataEntryUrlBox {

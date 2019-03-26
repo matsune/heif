@@ -1,4 +1,5 @@
-use crate::bbox::header::BoxHeader;
+use crate::bbox::header::{BoxHeader, Header};
+use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
@@ -18,6 +19,13 @@ impl std::default::Default for FileTypeBox {
             minor_version: 0,
             compatibles: Vec::new(),
         }
+    }
+}
+
+impl BBox for FileTypeBox {
+    type HeaderType = BoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.box_header
     }
 }
 

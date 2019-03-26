@@ -4,6 +4,7 @@ mod ispe;
 use std::collections::HashMap;
 
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::{HeifError, Result};
 use hevc::HevcConfigurationBox;
@@ -25,6 +26,13 @@ impl Default for ItemPropertiesBox {
             container: ItemPropertyContainer::default(),
             association_boxes: Vec::new(),
         }
+    }
+}
+
+impl BBox for ItemPropertiesBox {
+    type HeaderType = BoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.box_header
     }
 }
 
@@ -56,9 +64,70 @@ impl ItemPropertiesBox {
     pub fn box_header(&self) -> &BoxHeader {
         &self.box_header
     }
+
+    pub fn property_by_index(&self, idx: usize) -> Option<&Box<ItemProperty>> {
+        self.container.property_at(idx)
+    }
+
+    pub fn find_property_index(&self, p_type: PropertyType, item_id: &u32) -> u32 {
+        for ipma in &self.association_boxes {
+            if let Some(property_index_vector) = ipma.get_association_entries(item_id) {
+                for entry in property_index_vector {
+                    if let Some(item_property) =
+                        self.container.property_at(entry.index as usize - 1)
+                    {
+                        if self.get_property_type(item_property.as_ref()) == p_type {
+                            return entry.index as u32;
+                        }
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+
+    fn get_property_type(&self, property: &ItemProperty) -> PropertyType {
+        match property.box_type().to_string().as_str() {
+            "auxC" => PropertyType::AUXC,
+            "avcC" => PropertyType::AVCC,
+            "clap" => PropertyType::CLAP,
+            "colr" => PropertyType::COLR,
+            "free" => PropertyType::FREE,
+            "hvcC" => PropertyType::HVCC,
+            "imir" => PropertyType::IMIR,
+            "irot" => PropertyType::IROT,
+            "ispe" => PropertyType::ISPE,
+            "jpgC" => PropertyType::JPGC,
+            "pasp" => PropertyType::PASP,
+            "pixi" => PropertyType::PIXI,
+            "rloc" => PropertyType::RLOC,
+            "skip" => PropertyType::FREE,
+            _ => PropertyType::RAW,
+        }
+    }
 }
 
-pub trait ItemProperty {}
+#[derive(Debug, PartialEq, Eq)]
+pub enum PropertyType {
+    RAW,
+    AUXC,
+    AVCC,
+    CLAP,
+    COLR,
+    FREE,
+    HVCC,
+    IMIR,
+    IROT,
+    ISPE,
+    JPGC,
+    PASP,
+    PIXI,
+    RLOC,
+}
+
+pub trait ItemProperty {
+    fn box_type(&self) -> &Byte4;
+}
 
 pub struct ItemPropertyContainer {
     box_header: BoxHeader,
@@ -77,6 +146,13 @@ impl Default for ItemPropertyContainer {
             box_header: BoxHeader::new(Byte4::from_str("ipco").unwrap()),
             properties: Vec::new(),
         }
+    }
+}
+
+impl BBox for ItemPropertyContainer {
+    type HeaderType = BoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.box_header
     }
 }
 
@@ -144,6 +220,13 @@ impl Default for ItemPropertyAssociation {
     }
 }
 
+impl BBox for ItemPropertyAssociation {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
+    }
+}
+
 impl ItemPropertyAssociation {
     fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
         let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
@@ -195,7 +278,7 @@ impl ItemPropertyAssociation {
         }
     }
 
-    pub fn association_entries_at(&self, item_id: u32) -> Option<&AssociationEntries> {
-        self.associations.get(&item_id)
+    pub fn get_association_entries(&self, item_id: &u32) -> Option<&AssociationEntries> {
+        self.associations.get(item_id)
     }
 }

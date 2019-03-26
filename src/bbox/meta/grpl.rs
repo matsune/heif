@@ -1,4 +1,5 @@
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
@@ -16,6 +17,13 @@ impl Default for GroupListBox {
             box_header: BoxHeader::new(Byte4::from_str("grpl").unwrap()),
             entity_to_group_box_vector: Vec::new(),
         }
+    }
+}
+
+impl BBox for GroupListBox {
+    type HeaderType = BoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.box_header
     }
 }
 

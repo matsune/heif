@@ -1,4 +1,5 @@
-use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::header::{BoxHeader, FullBoxHeader, Header};
+use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
@@ -16,6 +17,13 @@ impl Default for PrimaryItemBox {
             full_box_header: FullBoxHeader::new(Byte4::from_str("pitm").unwrap(), 0, 0),
             item_id: 0,
         }
+    }
+}
+
+impl BBox for PrimaryItemBox {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
     }
 }
 

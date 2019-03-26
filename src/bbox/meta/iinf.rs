@@ -1,4 +1,5 @@
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
@@ -13,6 +14,13 @@ pub struct ItemInfoBox {
 impl Default for ItemInfoBox {
     fn default() -> Self {
         ItemInfoBox::new(0)
+    }
+}
+
+impl BBox for ItemInfoBox {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
     }
 }
 
@@ -50,12 +58,16 @@ impl ItemInfoBox {
         self.item_info_list.iter().map(|i| i.item_id).collect()
     }
 
+    pub fn item_info_list(&self) -> &Vec<ItemInfoEntry> {
+        &self.item_info_list
+    }
+
     pub fn add_item_info_entry(&mut self, info_entry: ItemInfoEntry) {
         self.item_info_list.push(info_entry);
     }
 
-    pub fn item_by_id(&self, id: u32) -> Option<&ItemInfoEntry> {
-        self.item_info_list.iter().find(|i| i.item_id == id)
+    pub fn item_by_id(&self, id: &u32) -> Option<&ItemInfoEntry> {
+        self.item_info_list.iter().find(|i| i.item_id == *id)
     }
 
     pub fn item_by_type(&self, item_type: Byte4) -> Option<&ItemInfoEntry> {
@@ -77,6 +89,13 @@ pub struct ItemInfoEntry {
     item_info_extension: ItemInfoExtension,
     item_type: Byte4,
     item_uri_type: String,
+}
+
+impl BBox for ItemInfoEntry {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
+    }
 }
 
 impl ItemInfoEntry {

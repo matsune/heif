@@ -1,4 +1,5 @@
-use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::header::{BoxHeader, FullBoxHeader, Header};
+use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
@@ -121,6 +122,13 @@ impl Default for ItemLocationBox {
             index_size: 0,
             locations: Vec::new(),
         }
+    }
+}
+
+impl BBox for ItemLocationBox {
+    type HeaderType = FullBoxHeader;
+    fn header(&self) -> &Self::HeaderType {
+        &self.full_box_header
     }
 }
 
