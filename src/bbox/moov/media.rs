@@ -1,5 +1,5 @@
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
-use crate::bbox::meta::dinf::DataEntry;
+use crate::bbox::meta::dinf::DataEntryBox;
 
 #[derive(Debug)]
 pub struct MediaBox {
@@ -68,7 +68,7 @@ struct DataInformationBox {
 
 struct DataReferenceBox {
     full_box_header: FullBoxHeader,
-    data_entries: Vec<Box<DataEntry>>,
+    data_entries: Vec<DataEntryBox>,
 }
 
 impl std::fmt::Debug for DataReferenceBox {

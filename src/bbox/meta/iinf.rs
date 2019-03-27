@@ -18,9 +18,8 @@ impl Default for ItemInfoBox {
 }
 
 impl BBox for ItemInfoBox {
-    type HeaderType = FullBoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.full_box_header
+    fn box_type(&self) -> &Byte4 {
+        self.full_box_header.box_type()
     }
 }
 
@@ -92,9 +91,8 @@ pub struct ItemInfoEntry {
 }
 
 impl BBox for ItemInfoEntry {
-    type HeaderType = FullBoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.full_box_header
+    fn box_type(&self) -> &Byte4 {
+        self.full_box_header.box_type()
     }
 }
 

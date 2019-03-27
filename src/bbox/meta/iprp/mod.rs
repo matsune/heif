@@ -1,6 +1,7 @@
 mod hevc;
 mod ispe;
 
+use std::any::Any;
 use std::collections::HashMap;
 
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
@@ -30,9 +31,8 @@ impl Default for ItemPropertiesBox {
 }
 
 impl BBox for ItemPropertiesBox {
-    type HeaderType = BoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.box_header
+    fn box_type(&self) -> &Byte4 {
+        self.box_header.box_type()
     }
 }
 
@@ -65,7 +65,7 @@ impl ItemPropertiesBox {
         &self.box_header
     }
 
-    pub fn property_by_index(&self, idx: usize) -> Option<&Box<ItemProperty>> {
+    pub fn property_by_index(&self, idx: usize) -> Option<&Box<BBox>> {
         self.container.property_at(idx)
     }
 
@@ -76,7 +76,7 @@ impl ItemPropertiesBox {
                     if let Some(item_property) =
                         self.container.property_at(entry.index as usize - 1)
                     {
-                        if self.get_property_type(item_property.as_ref()) == p_type {
+                        if self.get_property_type(item_property) == p_type {
                             return entry.index as u32;
                         }
                     }
@@ -86,7 +86,7 @@ impl ItemPropertiesBox {
         return 0;
     }
 
-    fn get_property_type(&self, property: &ItemProperty) -> PropertyType {
+    fn get_property_type(&self, property: &Box<BBox>) -> PropertyType {
         match property.box_type().to_string().as_str() {
             "auxC" => PropertyType::AUXC,
             "avcC" => PropertyType::AVCC,
@@ -125,13 +125,9 @@ pub enum PropertyType {
     RLOC,
 }
 
-pub trait ItemProperty {
-    fn box_type(&self) -> &Byte4;
-}
-
 pub struct ItemPropertyContainer {
     box_header: BoxHeader,
-    properties: Vec<Box<ItemProperty>>,
+    properties: Vec<Box<BBox>>,
 }
 
 impl std::fmt::Debug for ItemPropertyContainer {
@@ -150,9 +146,8 @@ impl Default for ItemPropertyContainer {
 }
 
 impl BBox for ItemPropertyContainer {
-    type HeaderType = BoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.box_header
+    fn box_type(&self) -> &Byte4 {
+        self.box_header.box_type()
     }
 }
 
@@ -161,11 +156,11 @@ impl ItemPropertyContainer {
         if box_header.box_type() != "ipco" {
             // TODO: ?
         }
-        let mut properties: Vec<Box<ItemProperty>> = Vec::new();
+        let mut properties: Vec<Box<BBox>> = Vec::new();
         while !stream.is_eof() {
             let sub_box_header = BoxHeader::from_stream(stream)?;
             let mut ex = stream.extract_from(&sub_box_header)?;
-            let property: Box<ItemProperty> = match sub_box_header.box_type().to_string().as_str() {
+            let property: Box<BBox> = match sub_box_header.box_type().to_string().as_str() {
                 "hvcC" => Box::new(HevcConfigurationBox::from_stream_header(
                     &mut ex,
                     sub_box_header,
@@ -185,11 +180,11 @@ impl ItemPropertyContainer {
         })
     }
 
-    pub fn property_at(&self, index: usize) -> Option<&Box<ItemProperty>> {
+    pub fn property_at(&self, index: usize) -> Option<&Box<BBox>> {
         self.properties.get(index)
     }
 
-    pub fn add_property(&mut self, prop: Box<ItemProperty>) {
+    pub fn add_property(&mut self, prop: Box<BBox>) {
         self.properties.push(prop);
     }
 }
@@ -221,9 +216,8 @@ impl Default for ItemPropertyAssociation {
 }
 
 impl BBox for ItemPropertyAssociation {
-    type HeaderType = FullBoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.full_box_header
+    fn box_type(&self) -> &Byte4 {
+        self.full_box_header.box_type()
     }
 }
 

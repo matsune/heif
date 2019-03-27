@@ -21,9 +21,8 @@ impl Default for DataInformationBox {
 }
 
 impl BBox for DataInformationBox {
-    type HeaderType = BoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.box_header
+    fn box_type(&self) -> &Byte4 {
+        self.box_header.box_type()
     }
 }
 
@@ -46,14 +45,14 @@ impl DataInformationBox {
         &self.box_header
     }
 
-    pub fn add_entry(&mut self, entry: Box<DataEntry>) {
+    pub fn add_entry(&mut self, entry: DataEntryBox) {
         self.data_reference_box.add_entry(entry);
     }
 }
 
 pub struct DataReferenceBox {
     full_box_header: FullBoxHeader,
-    data_entries: Vec<Box<DataEntry>>,
+    data_entries: Vec<DataEntryBox>,
 }
 
 impl std::fmt::Debug for DataReferenceBox {
@@ -63,9 +62,8 @@ impl std::fmt::Debug for DataReferenceBox {
 }
 
 impl BBox for DataReferenceBox {
-    type HeaderType = FullBoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.full_box_header
+    fn box_type(&self) -> &Byte4 {
+        self.full_box_header.box_type()
     }
 }
 
@@ -93,16 +91,9 @@ impl DataReferenceBox {
         for _ in 0..entry_count {
             let child_box_header = BoxHeader::from_stream(stream)?;
             let mut ex = stream.extract_from(&child_box_header)?;
-            let data_entry: Box<DataEntry> = match child_box_header.box_type().to_string().as_str()
-            {
-                "urn " => Box::new(DataEntryUrnBox::from_stream_header(
-                    &mut ex,
-                    child_box_header,
-                )?),
-                "url " => Box::new(DataEntryUrlBox::from_stream_header(
-                    &mut ex,
-                    child_box_header,
-                )?),
+            let data_entry = match child_box_header.box_type().to_string().as_str() {
+                "urn " => DataEntryBox::from_stream_header_urn(&mut ex, child_box_header)?,
+                "url " => DataEntryBox::from_stream_header_url(&mut ex, child_box_header)?,
                 _ => return Err(HeifError::InvalidFormat),
             };
             self.data_entries.push(data_entry);
@@ -114,24 +105,25 @@ impl DataReferenceBox {
         &self.full_box_header
     }
 
-    pub fn add_entry(&mut self, entry: Box<DataEntry>) {
+    pub fn add_entry(&mut self, entry: DataEntryBox) {
         self.data_entries.push(entry);
     }
 }
-
-pub trait DataEntry {}
 
 #[derive(Debug)]
 pub struct DataEntryBox {
     full_box_header: FullBoxHeader,
     location: String,
+    name: String, // used urn only
 }
 
 impl BBox for DataEntryBox {
-    type HeaderType = FullBoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.full_box_header
-    }
+    fn box_type(&self) -> &Byte4 {
+        self.full_box_header.box_type()
+    } // type HeaderType = FullBoxHeader;
+      // fn header(&self) -> &Self::HeaderType {
+      //     &self.full_box_header
+      // }
 }
 
 impl DataEntryBox {
@@ -139,56 +131,45 @@ impl DataEntryBox {
         Self {
             full_box_header: FullBoxHeader::new(box_type, version, flags),
             location: String::new(),
-        }
-    }
-
-    pub fn full_box_header(&self) -> &FullBoxHeader {
-        &self.full_box_header
-    }
-
-    pub fn location(&self) -> &String {
-        &self.location
-    }
-
-    pub fn set_location(&mut self, loc: String) {
-        self.location = loc;
-    }
-}
-
-impl DataEntry for DataEntryBox {}
-
-pub struct DataEntryUrnBox {
-    full_box_header: FullBoxHeader,
-    location: String,
-    name: String,
-}
-
-impl Default for DataEntryUrnBox {
-    fn default() -> Self {
-        Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("urn ").unwrap(), 0, 0),
-            location: String::new(),
             name: String::new(),
         }
     }
-}
 
-impl BBox for DataEntryUrnBox {
-    type HeaderType = FullBoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.full_box_header
+    pub fn new_urn() -> Self {
+        Self::new(Byte4::from_str("urn ").unwrap(), 0, 0)
     }
-}
 
-impl DataEntryUrnBox {
-    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
+    pub fn new_url(is_self_contained: bool) -> Self {
+        Self::new(Byte4::from_str("url ").unwrap(), 0, 0)
+    }
+
+    pub fn from_stream_header_urn<T: Stream>(
+        stream: &mut T,
+        box_header: BoxHeader,
+    ) -> Result<Self> {
         let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
         let name = stream.read_zero_term_string();
         let location = stream.read_zero_term_string();
         Ok(Self {
             full_box_header,
-            name,
             location,
+            name,
+        })
+    }
+
+    pub fn from_stream_header_url<T: Stream>(
+        stream: &mut T,
+        box_header: BoxHeader,
+    ) -> Result<Self> {
+        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
+        let mut location = String::new();
+        if (full_box_header.flags() & 1) != 0 {
+            location = stream.read_zero_term_string();
+        }
+        Ok(Self {
+            full_box_header,
+            location,
+            name: String::new(),
         })
     }
 
@@ -212,53 +193,3 @@ impl DataEntryUrnBox {
         self.name = name;
     }
 }
-
-impl DataEntry for DataEntryUrnBox {}
-
-pub struct DataEntryUrlBox {
-    full_box_header: FullBoxHeader,
-    location: String,
-}
-
-impl BBox for DataEntryUrlBox {
-    type HeaderType = FullBoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.full_box_header
-    }
-}
-
-impl DataEntryUrlBox {
-    pub fn new(is_self_contained: bool) -> Self {
-        let flags = if is_self_contained { 1 } else { 0 };
-        Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("url ").unwrap(), 0, flags),
-            location: String::new(),
-        }
-    }
-
-    pub fn from_stream_header<T: Stream>(stream: &mut T, box_header: BoxHeader) -> Result<Self> {
-        let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
-        let mut location = String::new();
-        if (full_box_header.flags() & 1) != 0 {
-            location = stream.read_zero_term_string();
-        }
-        Ok(Self {
-            full_box_header,
-            location,
-        })
-    }
-
-    pub fn full_box_header(&self) -> &FullBoxHeader {
-        &self.full_box_header
-    }
-
-    pub fn location(&self) -> &String {
-        &self.location
-    }
-
-    pub fn set_location(&mut self, loc: String) {
-        self.location = loc;
-    }
-}
-
-impl DataEntry for DataEntryUrlBox {}

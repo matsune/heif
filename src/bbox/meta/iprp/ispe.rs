@@ -1,5 +1,4 @@
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
-use crate::bbox::meta::iprp::ItemProperty;
 use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
@@ -20,13 +19,6 @@ impl Default for ImageSpatialExtentsProperty {
 }
 
 impl BBox for ImageSpatialExtentsProperty {
-    type HeaderType = FullBoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.full_box_header
-    }
-}
-
-impl ItemProperty for ImageSpatialExtentsProperty {
     fn box_type(&self) -> &Byte4 {
         self.full_box_header.box_type()
     }

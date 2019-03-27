@@ -21,9 +21,8 @@ impl Default for ItemProtectionBox {
 }
 
 impl BBox for ItemProtectionBox {
-    type HeaderType = FullBoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.full_box_header
+    fn box_type(&self) -> &Byte4 {
+        self.full_box_header.box_type()
     }
 }
 

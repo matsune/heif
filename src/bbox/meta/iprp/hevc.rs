@@ -1,5 +1,4 @@
 use crate::bbox::header::{BoxHeader, FullBoxHeader};
-use crate::bbox::meta::iprp::ItemProperty;
 use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::{HeifError, Result};
@@ -19,13 +18,6 @@ impl Default for HevcConfigurationBox {
 }
 
 impl BBox for HevcConfigurationBox {
-    type HeaderType = BoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.box_header
-    }
-}
-
-impl ItemProperty for HevcConfigurationBox {
     fn box_type(&self) -> &Byte4 {
         self.box_header.box_type()
     }

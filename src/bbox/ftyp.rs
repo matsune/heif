@@ -23,9 +23,8 @@ impl std::default::Default for FileTypeBox {
 }
 
 impl BBox for FileTypeBox {
-    type HeaderType = BoxHeader;
-    fn header(&self) -> &Self::HeaderType {
-        &self.box_header
+    fn box_type(&self) -> &Byte4 {
+        self.box_header.box_type()
     }
 }
 

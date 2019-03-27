@@ -343,8 +343,8 @@ impl HeifReader {
                     continue;
                 }
 
-                // TODO 
-                // DecoderConfigurationBox child may be HevcConfigurationBox or AvcConfigurationBox 
+                // TODO
+                // DecoderConfigurationBox child may be HevcConfigurationBox or AvcConfigurationBox
             }
         }
     }
