@@ -1,7 +1,7 @@
-use crate::bbox::header::{BoxHeader, FullBoxHeader};
+use crate::bbox::header::BoxHeader;
 use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
-use crate::{HeifError, Result};
+use crate::Result;
 
 use std::str::FromStr;
 
@@ -40,6 +40,10 @@ impl HevcConfigurationBox {
             box_header,
             hevc_config: HevcDecoderConfigurationRecord::from_stream(stream)?,
         })
+    }
+
+    pub fn config(&self) -> &HevcDecoderConfigurationRecord {
+        &self.hevc_config
     }
 }
 

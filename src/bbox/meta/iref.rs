@@ -1,4 +1,4 @@
-use crate::bbox::header::{BoxHeader, FullBoxHeader, Header};
+use crate::bbox::header::{BoxHeader, FullBoxHeader};
 use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::{HeifError, Result};

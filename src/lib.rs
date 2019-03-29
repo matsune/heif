@@ -1,5 +1,7 @@
 mod bbox;
 mod bit;
+mod data;
+mod internal;
 pub mod reader;
 
 pub type Result<T> = std::result::Result<T, HeifError>;

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::File;
 use std::str::FromStr;
 
@@ -9,6 +9,8 @@ use crate::bbox::meta::iprp::PropertyType;
 use crate::bbox::meta::MetaBox;
 use crate::bbox::moov::MovieBox;
 use crate::bit::{BitStream, Byte4, Stream};
+use crate::data::*;
+use crate::internal::*;
 use crate::{HeifError, Result};
 
 type MetaBoxMap = HashMap<u32, MetaBox>;
@@ -48,15 +50,17 @@ impl HeifReader {
                     return Err(HeifError::InvalidFormat);
                 }
                 metabox_found = true;
+                let context_id = 0;
                 let mut ex = stream.extract_from(&header)?;
                 self.metabox_map
-                    .insert(0, MetaBox::from_stream_header(&mut ex, header)?);
-                let metabox = self.metabox_map.get(&0).unwrap();
+                    .insert(context_id, MetaBox::from_stream_header(&mut ex, header)?);
+                let metabox = self.metabox_map.get(&context_id).unwrap();
                 self.file_properties.root_meta_box_properties =
                     self.extract_metabox_properties(&metabox);
-                self.metabox_info.insert(0, self.extract_items(&metabox, 0));
+                self.metabox_info
+                    .insert(context_id, self.extract_items(&metabox, context_id));
 
-                self.process_decoder_config_properties(&0);
+                self.process_decoder_config_properties(&context_id);
             } else if box_type == "moov" {
                 if movie_found {
                     return Err(HeifError::InvalidFormat);
@@ -332,8 +336,9 @@ impl HeifReader {
                 let image_id = image_properties.0;
                 if let Some(hvcc_index) = iprp.find_property_index(PropertyType::HVCC, &image_id) {
                     if let Some(prop) = iprp.property_by_index(hvcc_index as usize) {
-                        if let Some(prop) = prop.as_any().downcast_ref::<HevcConfigurationBox>() {
-                            println!(">>{:?}", prop);
+                        if let Some(hevc_box) = prop.as_any().downcast_ref::<HevcConfigurationBox>()
+                        {
+                            // self.make_decoder_parameter_set_map(hevc_box.config())
                             panic!("!!!!!");
                         }
                     }
@@ -352,294 +357,6 @@ impl HeifReader {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct FileInformationInternal {
-    file_feature: FileFeature,
-    track_properties: HashMap<u32, TrackProperties>,
-    root_meta_box_properties: MetaBoxProperties,
-    movie_timescale: u32,
-}
-
-#[derive(Debug, Default)]
-pub struct FileFeature {
-    file_feature_set: HashSet<FileFeatureEnum>,
-}
-
-impl FileFeature {
-    pub fn has_feature(&self, feature: &FileFeatureEnum) -> bool {
-        self.file_feature_set.contains(feature)
-    }
-
-    pub fn set_feature(&mut self, feature: FileFeatureEnum) {
-        self.file_feature_set.insert(feature);
-    }
-
-    pub fn feature_mask(&self) -> u32 {
-        let mut mask = 0u32;
-        for set in &self.file_feature_set {
-            mask |= *set as u32;
-        }
-        mask
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum FileFeatureEnum {
-    HasSingleImage = 1,
-    HasImageCollection = 1 << 1,
-    HasImageSequence = 1 << 2,
-    HasRootLevelMetaBox = 1 << 3,
-    HasAlternateTracks = 1 << 4,
-}
-
-type IdVec = Vec<u32>;
-
-#[derive(Debug)]
-pub struct TrackProperties {
-    track_id: u32,
-    alternate_group_id: u32,
-    track_feature: TrackFeature,
-    sample_properties: HashMap<u32, SampleProperties>,
-    alternate_track_ids: IdVec,
-    reference_track_ids: HashMap<String, IdVec>,
-    grouped_samples: Vec<SampleGrouping>,
-    equivalences: Vec<SampleVisualEquivalence>,
-    metadatas: Vec<SampleToMetadataItem>,
-    reference_samples: Vec<DirectReferenceSamples>,
-    max_sample_size: u64,
-    time_scale: u32,
-    edit_list: EditList,
-}
-
-#[derive(Debug, Default)]
-pub struct TrackFeature {
-    track_feature_set: HashSet<TrackFeatureEnum>,
-}
-
-impl TrackFeature {
-    pub fn has_feature(&self, feature: &TrackFeatureEnum) -> bool {
-        self.track_feature_set.contains(feature)
-    }
-
-    pub fn set_feature(&mut self, feature: TrackFeatureEnum) {
-        self.track_feature_set.insert(feature);
-    }
-
-    pub fn feature_mask(&self) -> u32 {
-        let mut mask = 0u32;
-        for set in &self.track_feature_set {
-            mask |= *set as u32;
-        }
-        mask
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum TrackFeatureEnum {
-    IsMasterImageSequence = 1,
-    IsThumbnailImageSequence = 1 << 1,
-    IsAuxiliaryImageSequence = 1 << 2,
-    IsEnabled = 1 << 3,
-    IsInMovie = 1 << 4,
-    IsInPreview = 1 << 5,
-    HasAlternatives = 1 << 6,
-    HasCodingConstraints = 1 << 7,
-    HasSampleGroups = 1 << 8,
-    HasLinkedAuxiliaryImageSequence = 1 << 9,
-    HasLinkedThumbnailImageSequence = 1 << 10,
-    HasSampleToItemGrouping = 1 << 11,
-    HasExifSampleEntry = 1 << 12,
-    HasXmlSampleEntry = 1 << 13,
-    HasEditList = 1 << 14,
-    HasInfiniteLoopPlayback = 1 << 15,
-    HasSampleEquivalenceGrouping = 1 << 16,
-    IsAudioTrack = 1 << 17,
-    IsVideoTrack = 1 << 18,
-    DisplayAllSamples = 1 << 19,
-}
-
-#[derive(Debug)]
-pub struct SampleProperties {
-    sample_id: u32,
-    sample_entry_type: Byte4,
-    sample_description_index: u32,
-    sample_type: SampleType,
-    sample_duration_ts: u64,
-    sample_composition_offset_ts: i64,
-    has_clap: bool,
-    has_auxi: bool,
-    coding_constraints: CodingConstraints,
-    size: u64,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum SampleType {
-    OutputNonReferenceFrame,
-    OutputReferenceFrame,
-    NnonOutputReferenceFrame,
-}
-
-#[derive(Debug)]
-pub struct CodingConstraints {
-    all_ref_pics_intra: bool,
-    intra_pred_used: bool,
-    max_ref_per_pic: u8,
-}
-
-#[derive(Debug)]
-pub struct SampleAndEntryIDs {
-    sample_id: u32,
-    sample_group_description_index: u32,
-}
-
-#[derive(Debug)]
-pub struct SampleGrouping {
-    grouping_type: Byte4,
-    type_param: u32,
-    samples: Vec<SampleAndEntryIDs>,
-}
-
-#[derive(Debug)]
-pub struct SampleVisualEquivalence {
-    sample_group_description_index: u32,
-    time_offset: u16,
-    timescale_multiplier: u16,
-}
-
-#[derive(Debug)]
-pub struct SampleToMetadataItem {
-    sample_group_description_index: u32,
-    metadata_item_ids: Vec<u32>,
-}
-
-#[derive(Debug)]
-pub struct DirectReferenceSamples {
-    sample_group_description_index: u32,
-    sample_id: u32,
-    reference_item_ids: Vec<u32>,
-}
-
-#[derive(Debug)]
-pub struct EditList {
-    looping: bool,
-    repetitions: f64,
-    edit_units: Vec<EditUnit>,
-}
-
-#[derive(Debug)]
-pub struct EditUnit {
-    edit_type: EditType,
-    media_time_in_track_ts: i64,
-    duration_in_movie_ts: u64,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum EditType {
-    Empty,
-    Dwell,
-    Shift,
-}
-
-pub type ItemFeaturesMap = HashMap<u32, ItemFeature>;
-
-#[derive(Debug, Default)]
-struct MetaBoxProperties {
-    pub context_id: u32,
-    pub meta_box_feature: MetaBoxFeature,
-    pub item_features_map: ItemFeaturesMap,
-    pub entity_groupings: Vec<EntityGrouping>,
-}
-
-#[derive(Debug, Default)]
-pub struct MetaBoxFeature {
-    meta_box_feature_set: HashSet<MetaBoxFeatureEnum>,
-}
-
-impl MetaBoxFeature {
-    pub fn has_feature(&self, feature: &MetaBoxFeatureEnum) -> bool {
-        self.meta_box_feature_set.contains(feature)
-    }
-
-    pub fn set_feature(&mut self, feature: MetaBoxFeatureEnum) {
-        self.meta_box_feature_set.insert(feature);
-    }
-
-    pub fn feature_mask(&self) -> u32 {
-        let mut mask = 0u32;
-        for set in &self.meta_box_feature_set {
-            mask |= *set as u32;
-        }
-        mask
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum MetaBoxFeatureEnum {
-    IsSingleImage = 1,
-    IsImageCollection = 1 << 1,
-    HasMasterImages = 1 << 2,
-    HasThumbnails = 1 << 3,
-    HasAuxiliaryImages = 1 << 4,
-    HasDerivedImages = 1 << 5,
-    HasPreComputedDerivedImages = 1 << 6,
-    HasHiddenImages = 1 << 7,
-    HasGroupLists = 1 << 8,
-}
-
-#[derive(Debug, Default)]
-struct ItemFeature {
-    item_feature_set: HashSet<ItemFeatureEnum>,
-}
-
-impl ItemFeature {
-    pub fn has_feature(&self, feature: &ItemFeatureEnum) -> bool {
-        self.item_feature_set.contains(feature)
-    }
-
-    pub fn set_feature(&mut self, feature: ItemFeatureEnum) {
-        self.item_feature_set.insert(feature);
-    }
-
-    pub fn feature_mask(&self) -> u32 {
-        let mut mask = 0u32;
-        for set in &self.item_feature_set {
-            mask |= *set as u32;
-        }
-        mask
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-enum ItemFeatureEnum {
-    IsMasterImage = 1,
-    IsThumbnailImage = 1 << 1,
-    IsAuxiliaryImage = 1 << 2,
-    IsPrimaryImage = 1 << 3,
-    IsDerivedImage = 1 << 4,
-    IsPreComputedDerivedImage = 1 << 5,
-    IsHiddenImage = 1 << 6,
-    IsCoverImage = 1 << 7,
-    IsProtected = 1 << 8,
-    HasLinkedThumbnails = 1 << 9,
-    HasLinkedAuxiliaryImage = 1 << 10,
-    HasLinkedDerivedImage = 1 << 11,
-    HasLinkedPreComputedDerivedImage = 1 << 12,
-    HasLinkedTiles = 1 << 13,
-    HasLinkedMetadata = 1 << 14,
-    IsTileImageItem = 1 << 15,
-    IsMetadataItem = 1 << 16,
-    IsExifItem = 1 << 17,
-    IsXMPItem = 1 << 18,
-    IsMPEG7Item = 1 << 19,
-}
-
-#[derive(Debug, Default)]
-pub struct EntityGrouping {
-    group_type: Byte4,
-    group_id: u32,
-    entity_ids: Vec<u32>,
-}
-
 #[derive(Debug)]
 pub struct ItemInfo {
     item_type: Byte4,
@@ -653,34 +370,6 @@ pub struct ItemInfo {
 
 type ItemInfoMap = HashMap<u32, ItemInfo>;
 
-#[derive(Debug)]
-enum ItemPropertyType {
-    INVALID,
-
-    RAW,
-    AUXC,
-    AVCC,
-    CLAP,
-    COLR,
-    HVCC,
-    IMIR,
-    IROT,
-    ISPE,
-    JPGC,
-    PASP,
-    PIXI,
-    RLOC,
-}
-
-#[derive(Debug)]
-struct ItemPropertyInfo {
-    item_property_type: ItemPropertyType,
-    index: u32,
-    is_essential: bool,
-}
-
-type PropertyTypeVector = Vec<ItemPropertyInfo>;
-
 #[derive(Default, Debug)]
 pub struct MetaBoxInfo {
     displayable_master_images: usize,
@@ -688,28 +377,4 @@ pub struct MetaBoxInfo {
     grid_items: HashMap<u32, Grid>,
     iovl_items: HashMap<u32, Overlay>,
     properties: HashMap<u32, PropertyTypeVector>,
-}
-
-#[derive(Debug)]
-pub struct Grid {
-    output_width: u32,
-    output_height: u32,
-    columns: u32,
-    rows: u32,
-    image_ids: Vec<u32>,
-}
-
-#[derive(Debug)]
-struct Offset {
-    horizontal: i32,
-    vertical: i32,
-}
-
-#[derive(Debug)]
-pub struct Overlay {
-    rgba: (u16, u16, u16, u16),
-    output_width: u32,
-    output_height: u32,
-    offsets: Vec<Offset>,
-    image_ids: Vec<u32>,
 }

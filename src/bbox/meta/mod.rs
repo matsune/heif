@@ -9,10 +9,9 @@ pub mod iprp;
 pub mod iref;
 pub mod pitm;
 
-use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
-use crate::bbox::header::{BoxHeader, FullBoxHeader, Header};
+use crate::bbox::header::{BoxHeader, FullBoxHeader};
 use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
