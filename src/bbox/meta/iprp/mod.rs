@@ -25,7 +25,7 @@ pub enum DecoderParameterType {
 pub type ConfigurationMap = HashMap<DecoderParameterType, Vec<u8>>;
 
 pub trait DecoderConfigurationRecord {
-    fn getConfigurationMap(&self) -> ConfigurationMap;
+    fn configuration_map(&self) -> ConfigurationMap;
 }
 
 #[derive(Debug)]
@@ -88,21 +88,21 @@ impl ItemPropertiesBox {
         self.container.property_at(idx)
     }
 
-    pub fn find_property_index(&self, p_type: PropertyType, item_id: &u32) -> Option<u32> {
+    pub fn find_property_index(&self, p_type: PropertyType, item_id: &u32) -> u32 {
         for ipma in &self.association_boxes {
-            if let Some(property_index_vector) = ipma.get_association_entries(item_id) {
-                for entry in property_index_vector {
+            if let Some(association_entries) = ipma.get_association_entries(item_id) {
+                for entry in association_entries {
                     if let Some(item_property) =
                         self.container.property_at(entry.index as usize - 1)
                     {
                         if self.get_property_type(item_property) == p_type {
-                            return Some(entry.index as u32);
+                            return entry.index as u32;
                         }
                     }
                 }
             }
         }
-        None
+        0
     }
 
     fn get_property_type(&self, property: &Box<BBox>) -> PropertyType {

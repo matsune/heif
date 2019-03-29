@@ -1,5 +1,5 @@
 use crate::bbox::header::BoxHeader;
-use crate::bbox::meta::iprp::DecoderConfigurationRecord;
+use crate::bbox::meta::iprp::{ConfigurationMap, DecoderConfigurationRecord, DecoderParameterType};
 use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
@@ -108,8 +108,21 @@ impl Default for HevcDecoderConfigurationRecord {
 }
 
 impl DecoderConfigurationRecord for HevcDecoderConfigurationRecord {
-    fn getConfigurationMap(&self) -> ConfigurationMap {
-        unimplemented!("HevcDecoderConfigurationRecord getConfigurationMap")
+    fn configuration_map(&self) -> ConfigurationMap {
+        let mut m = ConfigurationMap::default();
+        m.insert(
+            DecoderParameterType::HevcSPS,
+            self.get_one_parameter_set(HevcNalUnitType::Sps),
+        );
+        m.insert(
+            DecoderParameterType::HevcPPS,
+            self.get_one_parameter_set(HevcNalUnitType::Pps),
+        );
+        m.insert(
+            DecoderParameterType::HevcVPS,
+            self.get_one_parameter_set(HevcNalUnitType::Vps),
+        );
+        m
     }
 }
 
@@ -170,14 +183,11 @@ impl HevcDecoderConfigurationRecord {
         for _ in 0..num_arrays {
             let array_completeness = stream.read_bits(1)? != 0;
             stream.read_bits(1);
-            let nal_unit_type = NalUnitType::from_u8(stream.read_bits(6)? as u8);
+            let nal_unit_type = HevcNalUnitType::from_u8(stream.read_bits(6)? as u8);
             let num_nalus = stream.read_2bytes()?.to_u16();
             for _ in 0..num_nalus {
-                let nal_size = stream.read_2bytes()?.to_u16();
-                let mut nal_data = Vec::new();
-                for _ in 0..nal_size {
-                    nal_data.push(stream.read_byte()?);
-                }
+                let nal_size = stream.read_2bytes()?.to_usize();
+                let nal_data = stream.read_bytes(nal_size)?;
                 res.add_nal_unit(nal_data, nal_unit_type, array_completeness);
             }
         }
@@ -186,11 +196,11 @@ impl HevcDecoderConfigurationRecord {
 
     fn add_nal_unit(
         &mut self,
-        nal_unit: Vec<u8>,
-        nal_unit_type: NalUnitType,
+        nal_unit: &[u8],
+        nal_unit_type: HevcNalUnitType,
         array_completeness: bool,
     ) {
-        let start_code_len = find_start_code_len(&nal_unit);
+        let start_code_len = find_start_code_len(nal_unit);
         let v = nal_unit[start_code_len..].to_vec();
         match self
             .nal_array
@@ -210,6 +220,21 @@ impl HevcDecoderConfigurationRecord {
             }
         };
     }
+
+    fn get_one_parameter_set(&self, nal_unit_type: HevcNalUnitType) -> Vec<u8> {
+        let mut res = Vec::<u8>::new();
+        for array in &self.nal_array {
+            if array.nal_unit_type == nal_unit_type && !array.nal_list.is_empty() {
+                res.push(0);
+                res.push(0);
+                res.push(0);
+                res.push(1);
+                let mut d = array.nal_list[0].clone();
+                res.append(&mut d);
+            }
+        }
+        res
+    }
 }
 
 fn find_start_code_len(data: &[u8]) -> usize {
@@ -226,7 +251,7 @@ fn find_start_code_len(data: &[u8]) -> usize {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-enum NalUnitType {
+enum HevcNalUnitType {
     CodedSliceTrailN, // 0
     CodedSliceTrailR, // 1
 
@@ -302,75 +327,75 @@ enum NalUnitType {
     Invalid,
 }
 
-impl NalUnitType {
-    fn from_u8(n: u8) -> NalUnitType {
+impl HevcNalUnitType {
+    fn from_u8(n: u8) -> Self {
         match n {
-            0 => NalUnitType::CodedSliceTrailN, // 0
-            1 => NalUnitType::CodedSliceTrailR, // 1
-            2 => NalUnitType::CodedSliceTsaN,   // 2
-            3 => NalUnitType::CodedSliceTsaR,   // 3
+            0 => HevcNalUnitType::CodedSliceTrailN, // 0
+            1 => HevcNalUnitType::CodedSliceTrailR, // 1
+            2 => HevcNalUnitType::CodedSliceTsaN,   // 2
+            3 => HevcNalUnitType::CodedSliceTsaR,   // 3
 
-            4 => NalUnitType::CodedSliceStsaN, // 4
-            5 => NalUnitType::CodedSliceStsaR, // 5
-            6 => NalUnitType::CodedSliceRadlN, // 6
-            7 => NalUnitType::CodedSliceRadlR, // 7
-            8 => NalUnitType::CodedSliceRaslN, // 8
-            9 => NalUnitType::CodedSliceRaslR, // 9
-            10 => NalUnitType::ReservedVclN10,
-            11 => NalUnitType::ReservedVclR11,
-            12 => NalUnitType::ReservedVclN12,
-            13 => NalUnitType::ReservedVclR13,
-            14 => NalUnitType::ReservedVclN14,
-            15 => NalUnitType::ReservedVclR15,
-            16 => NalUnitType::CodedSliceBlaWlp,   // 16
-            17 => NalUnitType::CodedSliceBlaWRa,   // 17
-            18 => NalUnitType::CodedSliceBlaNLP,   // 18
-            19 => NalUnitType::CodedSliceIdrWRADL, // 19
-            20 => NalUnitType::CodedSliceIdrNLP,   // 20
-            21 => NalUnitType::CodedSliceCra,      // 21
-            22 => NalUnitType::ReservedIrapVcl22,
-            23 => NalUnitType::ReservedIrapVcl23,
-            24 => NalUnitType::ReservedVcl24,
-            25 => NalUnitType::ReservedVcl25,
-            26 => NalUnitType::ReservedVcl26,
-            27 => NalUnitType::ReservedVcl27,
-            28 => NalUnitType::ReservedVcl28,
-            29 => NalUnitType::ReservedVcl29,
-            30 => NalUnitType::ReservedVcl30,
-            31 => NalUnitType::ReservedVcl31,
-            32 => NalUnitType::Vps,                 // 32
-            33 => NalUnitType::Sps,                 // 33
-            34 => NalUnitType::Pps,                 // 34
-            35 => NalUnitType::AccessUnitDelimiter, // 35
-            36 => NalUnitType::Eos,                 // 36
-            37 => NalUnitType::Eob,                 // 37
-            38 => NalUnitType::FilterData,          // 38
-            39 => NalUnitType::PrefixSei,           // 39
-            40 => NalUnitType::SuffixSei,           // 40
-            41 => NalUnitType::ReservedNVcl41,
-            42 => NalUnitType::ReservedNVcl42,
-            43 => NalUnitType::ReservedNVcl43,
-            44 => NalUnitType::ReservedNVcl44,
-            45 => NalUnitType::ReservedNVcl45,
-            46 => NalUnitType::ReservedNVcl46,
-            47 => NalUnitType::ReservedNVcl47,
-            48 => NalUnitType::Unspecified48,
-            49 => NalUnitType::Unspecified49,
-            50 => NalUnitType::Unspecified50,
-            51 => NalUnitType::Unspecified51,
-            52 => NalUnitType::Unspecified52,
-            53 => NalUnitType::Unspecified53,
-            54 => NalUnitType::Unspecified54,
-            55 => NalUnitType::Unspecified55,
-            56 => NalUnitType::Unspecified56,
-            57 => NalUnitType::Unspecified57,
-            58 => NalUnitType::Unspecified58,
-            59 => NalUnitType::Unspecified59,
-            60 => NalUnitType::Unspecified60,
-            61 => NalUnitType::Unspecified61,
-            62 => NalUnitType::Unspecified62,
-            63 => NalUnitType::Unspecified63,
-            _ => NalUnitType::Invalid,
+            4 => HevcNalUnitType::CodedSliceStsaN, // 4
+            5 => HevcNalUnitType::CodedSliceStsaR, // 5
+            6 => HevcNalUnitType::CodedSliceRadlN, // 6
+            7 => HevcNalUnitType::CodedSliceRadlR, // 7
+            8 => HevcNalUnitType::CodedSliceRaslN, // 8
+            9 => HevcNalUnitType::CodedSliceRaslR, // 9
+            10 => HevcNalUnitType::ReservedVclN10,
+            11 => HevcNalUnitType::ReservedVclR11,
+            12 => HevcNalUnitType::ReservedVclN12,
+            13 => HevcNalUnitType::ReservedVclR13,
+            14 => HevcNalUnitType::ReservedVclN14,
+            15 => HevcNalUnitType::ReservedVclR15,
+            16 => HevcNalUnitType::CodedSliceBlaWlp,   // 16
+            17 => HevcNalUnitType::CodedSliceBlaWRa,   // 17
+            18 => HevcNalUnitType::CodedSliceBlaNLP,   // 18
+            19 => HevcNalUnitType::CodedSliceIdrWRADL, // 19
+            20 => HevcNalUnitType::CodedSliceIdrNLP,   // 20
+            21 => HevcNalUnitType::CodedSliceCra,      // 21
+            22 => HevcNalUnitType::ReservedIrapVcl22,
+            23 => HevcNalUnitType::ReservedIrapVcl23,
+            24 => HevcNalUnitType::ReservedVcl24,
+            25 => HevcNalUnitType::ReservedVcl25,
+            26 => HevcNalUnitType::ReservedVcl26,
+            27 => HevcNalUnitType::ReservedVcl27,
+            28 => HevcNalUnitType::ReservedVcl28,
+            29 => HevcNalUnitType::ReservedVcl29,
+            30 => HevcNalUnitType::ReservedVcl30,
+            31 => HevcNalUnitType::ReservedVcl31,
+            32 => HevcNalUnitType::Vps,                 // 32
+            33 => HevcNalUnitType::Sps,                 // 33
+            34 => HevcNalUnitType::Pps,                 // 34
+            35 => HevcNalUnitType::AccessUnitDelimiter, // 35
+            36 => HevcNalUnitType::Eos,                 // 36
+            37 => HevcNalUnitType::Eob,                 // 37
+            38 => HevcNalUnitType::FilterData,          // 38
+            39 => HevcNalUnitType::PrefixSei,           // 39
+            40 => HevcNalUnitType::SuffixSei,           // 40
+            41 => HevcNalUnitType::ReservedNVcl41,
+            42 => HevcNalUnitType::ReservedNVcl42,
+            43 => HevcNalUnitType::ReservedNVcl43,
+            44 => HevcNalUnitType::ReservedNVcl44,
+            45 => HevcNalUnitType::ReservedNVcl45,
+            46 => HevcNalUnitType::ReservedNVcl46,
+            47 => HevcNalUnitType::ReservedNVcl47,
+            48 => HevcNalUnitType::Unspecified48,
+            49 => HevcNalUnitType::Unspecified49,
+            50 => HevcNalUnitType::Unspecified50,
+            51 => HevcNalUnitType::Unspecified51,
+            52 => HevcNalUnitType::Unspecified52,
+            53 => HevcNalUnitType::Unspecified53,
+            54 => HevcNalUnitType::Unspecified54,
+            55 => HevcNalUnitType::Unspecified55,
+            56 => HevcNalUnitType::Unspecified56,
+            57 => HevcNalUnitType::Unspecified57,
+            58 => HevcNalUnitType::Unspecified58,
+            59 => HevcNalUnitType::Unspecified59,
+            60 => HevcNalUnitType::Unspecified60,
+            61 => HevcNalUnitType::Unspecified61,
+            62 => HevcNalUnitType::Unspecified62,
+            63 => HevcNalUnitType::Unspecified63,
+            _ => HevcNalUnitType::Invalid,
         }
     }
 }
@@ -378,6 +403,6 @@ impl NalUnitType {
 #[derive(Debug)]
 struct NalArray {
     array_completeness: bool,
-    nal_unit_type: NalUnitType,
+    nal_unit_type: HevcNalUnitType,
     nal_list: Vec<Vec<u8>>,
 }

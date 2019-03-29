@@ -241,7 +241,7 @@ pub enum DecoderSpecInfoType {
     HevcSPS = 33,
     HevcPPS = 34,
 
-    AudioSpecificConfig,
+    AudioSpecificConfig = 35,
 }
 
 #[derive(Debug)]

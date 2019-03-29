@@ -340,28 +340,29 @@ impl HeifReader {
             {
                 let image_id = image_properties.0;
                 let id: Id = (*context_id, *image_id);
-                if let Some(hvcc_index) = iprp.find_property_index(PropertyType::HVCC, &image_id) {
-                    if let Some(prop) = iprp.property_by_index(hvcc_index as usize) {
-                        if let Some(hevc_box) = prop.as_any().downcast_ref::<HevcConfigurationBox>()
-                        {
-                            let config_index: Id = (*context_id, hvcc_index);
-                            if self.parameter_set_map.get(&config_index).is_none() {
-                                self.parameter_set_map.insert(
-                                    config_index,
-                                    self.make_decoder_parameter_set_map(hevc_box.config()),
-                                );
-                            }
-                            self.image_to_parameter_set_map.insert(id, config_index);
-                            self.decoder_code_type_map
-                                .insert(id, Byte4::from_str("hvc1").unwrap());
-                        }
-                    }
-                } else if let Some(avcc_index) =
-                    iprp.find_property_index(PropertyType::AVCC, &image_id)
-                {
-                    unimplemented!("Avcc");
+                let hvcc_index = iprp.find_property_index(PropertyType::HVCC, &image_id);
+                let avcc_index = iprp.find_property_index(PropertyType::AVCC, &image_id);
+                let mut config_index: Id = (0, 0);
+                if hvcc_index != 0 {
+                    config_index = (*context_id, hvcc_index);
+                } else if avcc_index != 0 {
+                    unimplemented!("avcc_index");
                 } else {
                     continue;
+                }
+                if let Some(prop) = iprp.property_by_index(config_index.1 as usize - 1) {
+                    if let Some(hevc_box) = prop.as_any().downcast_ref::<HevcConfigurationBox>() {
+                        let config_index: Id = (*context_id, hvcc_index);
+                        if self.parameter_set_map.get(&config_index).is_none() {
+                            self.parameter_set_map.insert(
+                                config_index,
+                                self.make_decoder_parameter_set_map(hevc_box.config()),
+                            );
+                        }
+                        self.image_to_parameter_set_map.insert(id, config_index);
+                        self.decoder_code_type_map
+                            .insert(id, Byte4::from_str("hvc1").unwrap());
+                    }
                 }
             }
         }
@@ -372,12 +373,24 @@ impl HeifReader {
         record: &T,
     ) -> ParameterSetMap {
         let mut pm = ParameterSetMap::default();
-        for (k, v) in record.getConfigurationMap().into_iter() {
-            // TODO
+        for (k, v) in record.configuration_map().into_iter() {
             let ty = match k {
                 DecoderParameterType::AvcSPS => DecoderSpecInfoType::AvcSPS,
-                _ => v as DecoderSpecInfoType,
+                DecoderParameterType::AvcPPS => DecoderSpecInfoType::AvcPPS,
+                DecoderParameterType::HevcVPS => DecoderSpecInfoType::HevcVPS,
+                DecoderParameterType::HevcSPS => DecoderSpecInfoType::HevcSPS,
+                DecoderParameterType::HevcPPS => DecoderSpecInfoType::HevcPPS,
+                DecoderParameterType::AudioSpecificConfig => {
+                    DecoderSpecInfoType::AudioSpecificConfig
+                }
             };
+            if let Some(m) = pm.get_mut(&ty) {
+                let mut tmp = v.clone();
+                tmp.append(m);
+                *m = tmp;
+            } else {
+                pm.insert(ty, v);
+            }
         }
         pm
     }
