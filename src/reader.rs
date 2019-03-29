@@ -5,7 +5,7 @@ use std::str::FromStr;
 use crate::bbox::ftyp::FileTypeBox;
 use crate::bbox::header::{BoxHeader, Header};
 use crate::bbox::meta::iprp::hevc::HevcConfigurationBox;
-use crate::bbox::meta::iprp::PropertyType;
+use crate::bbox::meta::iprp::{DecoderConfigurationRecord, DecoderParameterType, PropertyType};
 use crate::bbox::meta::MetaBox;
 use crate::bbox::moov::MovieBox;
 use crate::bit::{BitStream, Byte4, Stream};
@@ -13,14 +13,19 @@ use crate::data::*;
 use crate::internal::*;
 use crate::{HeifError, Result};
 
-type MetaBoxMap = HashMap<u32, MetaBox>;
-
 #[derive(Debug, Default)]
 pub struct HeifReader {
-    ftyp: FileTypeBox,
-    metabox_map: MetaBoxMap,
-    metabox_info: HashMap<u32, MetaBoxInfo>,
     file_properties: FileInformationInternal,
+    decoder_code_type_map: HashMap<Id, Byte4>,
+    parameter_set_map: HashMap<Id, ParameterSetMap>,
+    image_to_parameter_set_map: HashMap<Id, Id>,
+    // primary_item_id: Option<u32>,
+    ftyp: FileTypeBox,
+    // file_information: FileInformation,
+    metabox_map: HashMap<u32, MetaBox>,
+    metabox_info: HashMap<u32, MetaBoxInfo>,
+    // matrix: Vec<i32>,
+    // track_info: HashMap<u32, TrackInfo>,
 }
 
 impl HeifReader {
@@ -94,7 +99,7 @@ impl HeifReader {
         }
     }
 
-    fn extract_metabox_entity_to_group_maps(&self, metabox: &MetaBox) -> Vec<EntityGrouping> {
+    fn extract_metabox_entity_to_group_maps(&self, metabox: &MetaBox) -> Groupings {
         let mut groupings = Vec::new();
         for group_box in metabox.group_list_box().entity_to_group_box_vector() {
             groupings.push(EntityGrouping {
@@ -236,7 +241,7 @@ impl HeifReader {
     fn extract_metabox_feature(
         &self,
         image_features: &ItemFeaturesMap,
-        groupings: &Vec<EntityGrouping>,
+        groupings: &Groupings,
     ) -> MetaBoxFeature {
         let mut meta_box_feature = MetaBoxFeature::default();
         if groupings.len() > 0 {
@@ -325,7 +330,7 @@ impl HeifReader {
         Ok(entry.item_protection_index() > 0)
     }
 
-    pub fn process_decoder_config_properties(&self, context_id: &u32) {
+    pub fn process_decoder_config_properties(&mut self, context_id: &u32) {
         if let Some(iprp) = self.metabox_map.get(context_id) {
             let iprp = iprp.item_properties_box();
             for image_properties in &self
@@ -334,47 +339,96 @@ impl HeifReader {
                 .item_features_map
             {
                 let image_id = image_properties.0;
+                let id: Id = (*context_id, *image_id);
                 if let Some(hvcc_index) = iprp.find_property_index(PropertyType::HVCC, &image_id) {
                     if let Some(prop) = iprp.property_by_index(hvcc_index as usize) {
                         if let Some(hevc_box) = prop.as_any().downcast_ref::<HevcConfigurationBox>()
                         {
-                            // self.make_decoder_parameter_set_map(hevc_box.config())
-                            panic!("!!!!!");
+                            let config_index: Id = (*context_id, hvcc_index);
+                            if self.parameter_set_map.get(&config_index).is_none() {
+                                self.parameter_set_map.insert(
+                                    config_index,
+                                    self.make_decoder_parameter_set_map(hevc_box.config()),
+                                );
+                            }
+                            self.image_to_parameter_set_map.insert(id, config_index);
+                            self.decoder_code_type_map
+                                .insert(id, Byte4::from_str("hvc1").unwrap());
                         }
                     }
                 } else if let Some(avcc_index) =
                     iprp.find_property_index(PropertyType::AVCC, &image_id)
                 {
-
+                    unimplemented!("Avcc");
                 } else {
                     continue;
                 }
-
-                // TODO
-                // DecoderConfigurationBox child may be HevcConfigurationBox or AvcConfigurationBox
             }
         }
     }
+
+    fn make_decoder_parameter_set_map<T: DecoderConfigurationRecord>(
+        &self,
+        record: &T,
+    ) -> ParameterSetMap {
+        let mut pm = ParameterSetMap::default();
+        for (k, v) in record.getConfigurationMap().into_iter() {
+            // TODO
+            let ty = match k {
+                DecoderParameterType::AvcSPS => DecoderSpecInfoType::AvcSPS,
+                _ => v as DecoderSpecInfoType,
+            };
+        }
+        pm
+    }
 }
+
+type Properties = HashMap<u32, PropertyTypeVector>;
 
 #[derive(Debug)]
 pub struct ItemInfo {
-    item_type: Byte4,
-    name: String,
-    content_type: String,
-    content_encoding: String,
-    width: u32,
-    height: u32,
-    display_time: u64,
+    pub item_type: Byte4,
+    pub name: String,
+    pub content_type: String,
+    pub content_encoding: String,
+    pub width: u32,
+    pub height: u32,
+    pub display_time: u64,
 }
 
 type ItemInfoMap = HashMap<u32, ItemInfo>;
 
 #[derive(Default, Debug)]
 pub struct MetaBoxInfo {
-    displayable_master_images: usize,
-    item_info_map: ItemInfoMap,
-    grid_items: HashMap<u32, Grid>,
-    iovl_items: HashMap<u32, Overlay>,
-    properties: HashMap<u32, PropertyTypeVector>,
+    pub displayable_master_images: usize,
+    pub item_info_map: ItemInfoMap,
+    pub grid_items: HashMap<u32, Grid>,
+    pub iovl_items: HashMap<u32, Overlay>,
+    pub properties: HashMap<u32, PropertyTypeVector>,
+}
+
+#[derive(Default, Debug)]
+pub struct SampleInfo {
+    decoding_order: u32,
+    composition_times: Vec<i64>,
+    data_offset: u64,
+    data_length: u64,
+    width: u32,
+    height: u32,
+    decode_dependencies: IdVec,
+}
+
+type SampleInfoVector = Vec<SampleInfo>;
+
+#[derive(Debug)]
+struct TrackInfo {
+    samples: SampleInfoVector,
+    width: u32,
+    height: u32,
+    matrix: Vec<i32>,
+    duration: f64,
+    // TODO: pMap
+    clap_properties: HashMap<u32, CleanAperture>,
+    auxi_properties: HashMap<u32, AuxiliaryType>,
+    repetitions: f64,
 }

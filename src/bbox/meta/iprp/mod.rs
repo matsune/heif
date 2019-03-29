@@ -12,6 +12,22 @@ use ispe::ImageSpatialExtentsProperty;
 
 use std::str::FromStr;
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum DecoderParameterType {
+    AvcSPS,
+    AvcPPS,
+    HevcVPS,
+    HevcSPS,
+    HevcPPS,
+    AudioSpecificConfig,
+}
+
+pub type ConfigurationMap = HashMap<DecoderParameterType, Vec<u8>>;
+
+pub trait DecoderConfigurationRecord {
+    fn getConfigurationMap(&self) -> ConfigurationMap;
+}
+
 #[derive(Debug)]
 pub struct ItemPropertiesBox {
     box_header: BoxHeader,

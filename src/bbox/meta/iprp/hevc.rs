@@ -1,4 +1,5 @@
 use crate::bbox::header::BoxHeader;
+use crate::bbox::meta::iprp::DecoderConfigurationRecord;
 use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
@@ -103,6 +104,12 @@ impl Default for HevcDecoderConfigurationRecord {
             length_size_minus1: 0,
             nal_array: Vec::new(),
         }
+    }
+}
+
+impl DecoderConfigurationRecord for HevcDecoderConfigurationRecord {
+    fn getConfigurationMap(&self) -> ConfigurationMap {
+        unimplemented!("HevcDecoderConfigurationRecord getConfigurationMap")
     }
 }
 

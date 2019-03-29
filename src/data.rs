@@ -233,7 +233,7 @@ pub struct Rational {
     pub den: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum DecoderSpecInfoType {
     AvcSPS = 7,
     AvcPPS = 8,
@@ -294,6 +294,7 @@ pub struct ColorInformation {
     pub icc_profile: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub struct CleanAperture {
     pub width_n: u32,
     pub width_d: u32,
@@ -305,6 +306,7 @@ pub struct CleanAperture {
     pub vertical_offset_d: u32,
 }
 
+#[derive(Debug)]
 pub struct AuxiliaryType {
     pub aux_type: String,
     pub sub_type: String,

@@ -96,16 +96,22 @@ impl ItemFeature {
 }
 
 pub type IdVec = Vec<u32>;
+pub type DataVec = Vec<u8>;
+pub type TypeToIdsMap = HashMap<Byte4, IdVec>;
+pub type Groupings = Vec<EntityGrouping>;
+pub type ParameterSetMap = HashMap<DecoderSpecInfoType, DataVec>;
 pub type PropertyTypeVector = Vec<ItemPropertyInfo>;
 
 pub type ItemFeaturesMap = HashMap<u32, ItemFeature>;
+pub type TrackPropertiesMap = HashMap<u32, TrackProperties>;
+pub type SamplePropertiesMap = HashMap<u32, SampleProperties>;
 
 #[derive(Debug, Default)]
 pub struct MetaBoxProperties {
     pub context_id: u32,
     pub meta_box_feature: MetaBoxFeature,
     pub item_features_map: ItemFeaturesMap,
-    pub entity_groupings: Vec<EntityGrouping>,
+    pub entity_groupings: Groupings,
 }
 
 #[derive(Debug)]
@@ -152,3 +158,6 @@ pub struct FileInformationInternal {
     pub root_meta_box_properties: MetaBoxProperties,
     pub movie_timescale: u32,
 }
+
+// context_id, item_id
+pub type Id = (u32, u32);
