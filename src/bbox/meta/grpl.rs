@@ -24,6 +24,10 @@ impl BBox for GroupListBox {
     fn box_type(&self) -> &Byte4 {
         self.box_header.box_type()
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl GroupListBox {

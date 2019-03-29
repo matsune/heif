@@ -1,5 +1,5 @@
-mod hevc;
-mod ispe;
+pub mod hevc;
+pub mod ispe;
 
 use std::any::Any;
 use std::collections::HashMap;
@@ -33,6 +33,10 @@ impl Default for ItemPropertiesBox {
 impl BBox for ItemPropertiesBox {
     fn box_type(&self) -> &Byte4 {
         self.box_header.box_type()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -69,7 +73,7 @@ impl ItemPropertiesBox {
         self.container.property_at(idx)
     }
 
-    pub fn find_property_index(&self, p_type: PropertyType, item_id: &u32) -> u32 {
+    pub fn find_property_index(&self, p_type: PropertyType, item_id: &u32) -> Option<u32> {
         for ipma in &self.association_boxes {
             if let Some(property_index_vector) = ipma.get_association_entries(item_id) {
                 for entry in property_index_vector {
@@ -77,13 +81,13 @@ impl ItemPropertiesBox {
                         self.container.property_at(entry.index as usize - 1)
                     {
                         if self.get_property_type(item_property) == p_type {
-                            return entry.index as u32;
+                            return Some(entry.index as u32);
                         }
                     }
                 }
             }
         }
-        return 0;
+        None
     }
 
     fn get_property_type(&self, property: &Box<BBox>) -> PropertyType {
@@ -148,6 +152,10 @@ impl Default for ItemPropertyContainer {
 impl BBox for ItemPropertyContainer {
     fn box_type(&self) -> &Byte4 {
         self.box_header.box_type()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -218,6 +226,10 @@ impl Default for ItemPropertyAssociation {
 impl BBox for ItemPropertyAssociation {
     fn box_type(&self) -> &Byte4 {
         self.full_box_header.box_type()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

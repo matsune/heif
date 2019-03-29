@@ -24,6 +24,10 @@ impl BBox for ItemReferenceBox {
     fn box_type(&self) -> &Byte4 {
         self.full_box_header.box_type()
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl ItemReferenceBox {

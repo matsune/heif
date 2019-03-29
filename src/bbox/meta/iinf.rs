@@ -21,6 +21,10 @@ impl BBox for ItemInfoBox {
     fn box_type(&self) -> &Byte4 {
         self.full_box_header.box_type()
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl ItemInfoBox {
@@ -93,6 +97,10 @@ pub struct ItemInfoEntry {
 impl BBox for ItemInfoEntry {
     fn box_type(&self) -> &Byte4 {
         self.full_box_header.box_type()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

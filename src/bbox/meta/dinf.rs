@@ -24,6 +24,10 @@ impl BBox for DataInformationBox {
     fn box_type(&self) -> &Byte4 {
         self.box_header.box_type()
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl DataInformationBox {
@@ -64,6 +68,10 @@ impl std::fmt::Debug for DataReferenceBox {
 impl BBox for DataReferenceBox {
     fn box_type(&self) -> &Byte4 {
         self.full_box_header.box_type()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -120,10 +128,11 @@ pub struct DataEntryBox {
 impl BBox for DataEntryBox {
     fn box_type(&self) -> &Byte4 {
         self.full_box_header.box_type()
-    } // type HeaderType = FullBoxHeader;
-      // fn header(&self) -> &Self::HeaderType {
-      //     &self.full_box_header
-      // }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl DataEntryBox {

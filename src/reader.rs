@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use crate::bbox::ftyp::FileTypeBox;
 use crate::bbox::header::{BoxHeader, Header};
+use crate::bbox::meta::iprp::hevc::HevcConfigurationBox;
 use crate::bbox::meta::iprp::PropertyType;
 use crate::bbox::meta::MetaBox;
 use crate::bbox::moov::MovieBox;
@@ -329,16 +330,17 @@ impl HeifReader {
                 .item_features_map
             {
                 let image_id = image_properties.0;
-                let hvcc_index = iprp.find_property_index(PropertyType::HVCC, &image_id);
-                let avcc_index = iprp.find_property_index(PropertyType::AVCC, &image_id);
-                let mut config_index = (0, 0);
-                let mut ty = Byte4::default();
-                if hvcc_index != 0 {
-                    config_index = (*context_id, hvcc_index);
-                    ty = Byte4::from_str("hvc1").unwrap();
-                } else if avcc_index != 0 {
-                    config_index = (*context_id, avcc_index);
-                    ty = Byte4::from_str("avc1").unwrap();
+                if let Some(hvcc_index) = iprp.find_property_index(PropertyType::HVCC, &image_id) {
+                    if let Some(prop) = iprp.property_by_index(hvcc_index as usize) {
+                        if let Some(prop) = prop.as_any().downcast_ref::<HevcConfigurationBox>() {
+                            println!(">>{:?}", prop);
+                            panic!("!!!!!");
+                        }
+                    }
+                } else if let Some(avcc_index) =
+                    iprp.find_property_index(PropertyType::AVCC, &image_id)
+                {
+
                 } else {
                     continue;
                 }
