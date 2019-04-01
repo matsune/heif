@@ -6,6 +6,7 @@ use crate::bbox::ftyp::FileTypeBox;
 use crate::bbox::header::{BoxHeader, Header};
 use crate::bbox::meta::iloc::ConstructionMethod;
 use crate::bbox::meta::iprp::hevc::HevcConfigurationBox;
+use crate::bbox::meta::iprp::ispe::ImageSpatialExtentsProperty;
 use crate::bbox::meta::iprp::{DecoderConfigurationRecord, DecoderParameterType, PropertyType};
 use crate::bbox::meta::MetaBox;
 use crate::bbox::moov::MovieBox;
@@ -335,7 +336,7 @@ impl HeifReader {
             }
         }
         metabox_info.properties = self.process_item_properties(context_id)?;
-        // TODO: metabox_info.item_info_map = self.extract_item_info_map(metabox);
+        metabox_info.item_info_map = self.extract_item_info_map(metabox);
         Ok(metabox_info)
     }
 
@@ -359,6 +360,36 @@ impl HeifReader {
             }
         }
         Ok(propety_map)
+    }
+
+    fn extract_item_info_map(&self, metabox: &MetaBox) -> ItemInfoMap {
+        let mut item_info_map = ItemInfoMap::new();
+        let item_ids = metabox.item_info_box().item_ids();
+        for item_id in item_ids {
+            if let Some(item) = metabox.item_info_box().item_by_id(&item_id) {
+                let mut item_info = ItemInfo::default();
+                item_info.item_type = item.item_type().clone();
+                item_info.name = item.item_name().clone();
+                item_info.content_type = item.content_type().clone();
+                item_info.content_encoding = item.content_encoding().clone();
+                if self.is_image_item_type(&item_info.item_type) {
+                    let iprp = metabox.item_properties_box();
+                    let ispe_index = iprp.find_property_index(PropertyType::ISPE, &item_id);
+                    if ispe_index != 0 {
+                        if let Some(b) = iprp.property_by_index(ispe_index as usize - 1) {
+                            if let Some(image_spatial_extents_properties) =
+                                b.as_any().downcast_ref::<ImageSpatialExtentsProperty>()
+                            {
+                                item_info.height = image_spatial_extents_properties.height();
+                                item_info.width = image_spatial_extents_properties.width();
+                            }
+                        }
+                    }
+                }
+                item_info_map.insert(item_id, item_info);
+            }
+        }
+        item_info_map
     }
 
     fn item_property_type_from_property_type(&self, ty: &PropertyType) -> ItemPropertyType {
@@ -626,7 +657,7 @@ impl HeifReader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ItemInfo {
     pub item_type: Byte4,
     pub name: String,
