@@ -10,9 +10,10 @@ pub type Result<T> = std::result::Result<T, HeifError>;
 pub enum HeifError {
     FileOpen,
     FileRead,
-    InvalidFormat,
+    FileHeader,
     InvalidItemID,
     EOF,
+    Unknown(&'static str),
 }
 
 impl HeifError {
@@ -20,9 +21,10 @@ impl HeifError {
         match *self {
             HeifError::FileOpen => "FileOpen",
             HeifError::FileRead => "FileRead",
-            HeifError::InvalidFormat => "InvalidFormat",
+            HeifError::FileHeader => "FileHeader",
             HeifError::InvalidItemID => "InvalidItemID",
             HeifError::EOF => "EOF",
+            HeifError::Unknown(s) => s,
         }
     }
 }

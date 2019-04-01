@@ -102,7 +102,7 @@ impl DataReferenceBox {
             let data_entry = match child_box_header.box_type().to_string().as_str() {
                 "urn " => DataEntryBox::from_stream_header_urn(&mut ex, child_box_header)?,
                 "url " => DataEntryBox::from_stream_header_url(&mut ex, child_box_header)?,
-                _ => return Err(HeifError::InvalidFormat),
+                _ => return Err(HeifError::Unknown("An unknown box inside dref")),
             };
             self.data_entries.push(data_entry);
         }

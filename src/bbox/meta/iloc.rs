@@ -7,9 +7,9 @@ use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct ItemLocationExtent {
-    extent_index: usize,
-    extent_offset: usize,
-    extent_length: usize,
+    pub extent_index: usize,
+    pub extent_offset: usize,
+    pub extent_length: usize,
 }
 
 impl Default for ItemLocationExtent {
@@ -22,7 +22,7 @@ impl Default for ItemLocationExtent {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ConstructionMethod {
     FileOffset,
     IdatOffset,
@@ -102,6 +102,8 @@ impl ItemLocation {
     }
 }
 
+pub type ItemLocationVec = Vec<ItemLocation>;
+
 #[derive(Debug)]
 pub struct ItemLocationBox {
     full_box_header: FullBoxHeader,
@@ -109,7 +111,7 @@ pub struct ItemLocationBox {
     length_size: u8,
     base_offset_size: u8,
     index_size: u8,
-    locations: Vec<ItemLocation>,
+    locations: ItemLocationVec,
 }
 
 impl Default for ItemLocationBox {
@@ -225,6 +227,14 @@ impl ItemLocationBox {
         self.base_offset_size = n;
     }
 
+    pub fn index_size(&self) -> u8 {
+        self.index_size
+    }
+
+    pub fn set_index_size(&mut self, n: u8) {
+        self.index_size = n;
+    }
+
     pub fn locations_count(&self) -> usize {
         self.locations.len()
     }
@@ -234,5 +244,13 @@ impl ItemLocationBox {
             self.full_box_header.set_version(1);
         }
         self.locations.push(loc);
+    }
+
+    pub fn has_item_id_entry(&self, item_id: &u32) -> bool {
+        self.find_item(item_id).is_some()
+    }
+
+    pub fn find_item(&self, item_id: &u32) -> Option<&ItemLocation> {
+        self.locations.iter().find(|l| l.item_id() == *item_id)
     }
 }

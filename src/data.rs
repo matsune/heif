@@ -1,4 +1,5 @@
 use crate::bit::Byte4;
+use crate::internal::Groupings;
 
 #[derive(Debug)]
 pub enum TrackSampleType {
@@ -31,7 +32,7 @@ pub enum ItemPropertyType {
 #[derive(Debug)]
 pub struct ItemPropertyInfo {
     pub item_property_type: ItemPropertyType,
-    pub index: u32,
+    pub index: usize,
     pub is_essential: bool,
 }
 
@@ -99,21 +100,21 @@ pub struct ItemInformation {
     pub item_type: Byte4,
     pub description: ItemDescription,
     pub features: FeatureBitMask,
-    pub size: u64,
+    pub size: usize,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct EntityGrouping {
     pub group_type: Byte4,
     pub group_id: u32,
     pub entity_ids: Vec<u32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MetaBoxInformation {
     pub features: FeatureBitMask,
     pub item_informations: Vec<ItemInformation>,
-    pub entity_groupings: Vec<EntityGrouping>,
+    pub entity_groupings: Groupings,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -217,7 +218,7 @@ pub struct TrackInformation {
     pub edit_list: EditList,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FileInformation {
     pub features: FeatureBitMask,
     pub root_meta_box_information: MetaBoxInformation,

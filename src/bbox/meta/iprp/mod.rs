@@ -65,7 +65,9 @@ impl ItemPropertiesBox {
         while !stream.is_eof() {
             let sub_box_header = BoxHeader::from_stream(stream)?;
             if sub_box_header.box_type() != "ipma" {
-                return Err(HeifError::InvalidFormat);
+                return Err(HeifError::Unknown(
+                    "ItemPropertiesBox includes a box which is not ipma",
+                ));
             }
             let mut ex = stream.extract_from(&sub_box_header)?;
             association_boxes.push(ItemPropertyAssociation::from_stream_header(
@@ -124,7 +126,47 @@ impl ItemPropertiesBox {
             _ => PropertyType::RAW,
         }
     }
+
+    pub fn get_item_properties(&self, item_id: &u32) -> Result<PropertyInfos> {
+        let mut property_info_vec = PropertyInfos::new();
+        for ipma in &self.association_boxes {
+            if let Some(associations) = ipma.get_association_entries(item_id) {
+                for entry in associations {
+                    if entry.index == 0 {
+                        continue;
+                    }
+                    let index = entry.index as usize - 1;
+                    let item_property = match self.container.property_at(index) {
+                        Some(i) => i,
+                        None => return Err(HeifError::Unknown("invalid property index")),
+                    };
+                    let property_type = self.get_property_type(&Box::new(item_property));
+                    if property_type == PropertyType::FREE {
+                        continue;
+                    }
+                    property_info_vec.push(PropertyInfo {
+                        property_type,
+                        index,
+                        is_essential: entry.is_essential,
+                    });
+                }
+                if !associations.is_empty() {
+                    break;
+                }
+            }
+        }
+        Ok(property_info_vec)
+    }
 }
+
+#[derive(Debug)]
+pub struct PropertyInfo {
+    pub property_type: PropertyType,
+    pub index: usize,
+    pub is_essential: bool,
+}
+
+pub type PropertyInfos = Vec<PropertyInfo>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum PropertyType {
