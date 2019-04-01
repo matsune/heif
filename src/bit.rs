@@ -41,7 +41,7 @@ impl FromStr for Byte2 {
     }
 }
 
-#[derive(Clone, Default, Debug, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 pub struct Byte4(pub u8, pub u8, pub u8, pub u8);
 
 impl Byte4 {
@@ -65,6 +65,12 @@ impl Byte4 {
             "{}{}{}{}",
             self.0 as char, self.1 as char, self.2 as char, self.3 as char
         )
+    }
+}
+
+impl std::fmt::Debug for Byte4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Byte4(\"{}\")", self.to_string())
     }
 }
 

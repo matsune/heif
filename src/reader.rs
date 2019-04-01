@@ -92,7 +92,6 @@ impl HeifReader {
                 let mut ex = stream.extract_from(&header)?;
                 let movie_box = MovieBox::new(&mut ex, header)?;
             } else if box_type == "mdat" || box_type == "free" || box_type == "skip" {
-                println!(">>SKIPPING {}", box_type.to_string());
                 stream.skip_bytes(header.body_size() as usize)?;
             } else {
                 println!("unknown type {}", box_type.to_string());
@@ -105,7 +104,9 @@ impl HeifReader {
 
         self.file_information.root_meta_box_information =
             self.convert_root_meta_box_information(&self.file_properties.root_meta_box_properties);
+        // TODO: convertTrackInformation
         self.file_information.features = self.file_properties.file_feature.feature_mask();
+        self.file_information.movie_timescale = self.file_properties.movie_timescale;
 
         Ok(self)
     }
