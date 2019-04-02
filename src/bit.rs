@@ -217,7 +217,7 @@ pub trait Stream {
         if n == 0 {
             return Ok(0);
         }
-        let mut return_bits = 0;
+        let mut return_bits;
         let num_bits_left_in_byte = usize::from(8 - self.get_bit_offset());
         if num_bits_left_in_byte >= n {
             return_bits =

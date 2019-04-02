@@ -9,7 +9,7 @@ use crate::bbox::meta::iprp::ispe::ImageSpatialExtentsProperty;
 use crate::bbox::meta::iprp::{DecoderConfigurationRecord, DecoderParameterType, PropertyType};
 use crate::bbox::meta::MetaBox;
 use crate::bbox::moov::MovieBox;
-use crate::bit::{BitStream, Byte4, Stream};
+use crate::bit::{BitStream, Byte4,  Stream};
 use crate::data::*;
 use crate::internal::*;
 use crate::{HeifError, Result};
@@ -174,8 +174,10 @@ impl HeifReader {
 
                 self.file_properties.root_meta_box_properties =
                     self.extract_metabox_properties(&metabox);
-                self.metabox_info
-                    .insert(context_id, self.extract_items(&metabox, context_id)?);
+                self.metabox_info.insert(
+                    context_id,
+                    self.extract_items(&stream, &metabox, context_id)?,
+                );
 
                 self.process_decoder_config_properties(context_id);
 
@@ -398,7 +400,12 @@ impl HeifReader {
         refs.iter().any(|r| r.get_from_item_id() == item_id)
     }
 
-    fn extract_items(&self, metabox: &MetaBox, context_id: u32) -> Result<MetaBoxInfo> {
+    fn extract_items(
+        &self,
+        stream: &BitStream,
+        metabox: &MetaBox,
+        context_id: u32,
+    ) -> Result<MetaBoxInfo> {
         let mut metabox_info = MetaBoxInfo::default();
         for item in metabox.item_info_box().item_info_list() {
             if item.item_type() == "grid" || item.item_type() == "iovl" {
@@ -409,13 +416,84 @@ impl HeifReader {
                 if i_protected {
                     continue;
                 }
+
+                let ex_stream = self.load_item_data(stream, metabox, item.item_id())?;
                 // TODO
-                unimplemented!("extract_items");
+                unimplemented!("extract_items {:?}", ex);
             }
         }
         metabox_info.properties = self.process_item_properties(context_id)?;
         metabox_info.item_info_map = self.extract_item_info_map(metabox);
         Ok(metabox_info)
+    }
+
+    fn load_item_data(
+        &self,
+        stream: &BitStream,
+        metabox: &MetaBox,
+        item_id: u32,
+    ) -> Result<BitStream> {
+        let mut past_references = LinkedList::new();
+        let item_length = self.get_item_length(metabox, item_id, &mut past_references)?;
+        if !stream.has_bytes(item_length) {
+            return Err(HeifError::FileHeader);
+        }
+        Ok(BitStream::new(self.read_item(
+            stream,
+            metabox,
+            item_id,
+            item_length,
+        )?))
+    }
+
+    fn read_item(
+        &self,
+        stream: &BitStream,
+        metabox: &MetaBox,
+        item_id: u32,
+        max_size: usize,
+    ) -> Result<Vec<u8>> {
+        if !self.is_valid_item(item_id)? {
+            return Err(HeifError::InvalidItemID);
+        }
+        let iloc = metabox.item_location_box();
+        let version = iloc.full_box_header().version();
+        let item_location = match iloc.item_location_by_id(item_id) {
+            Some(i) => i,
+            None => return Err(HeifError::InvalidItemID),
+        };
+        let construction_method = item_location.construction_method();
+        let extent_list = item_location.extent_list();
+        let base_offset = item_location.base_offset();
+        if extent_list.is_empty() {
+            return Err(HeifError::FileRead);
+        }
+
+        let mut res = Vec::new();
+
+        let mut total_length = 0;
+        if version == 0 || (version >= 1 && construction_method == ConstructionMethod::FileOffset) {
+            unimplemented!("fileoffset")
+        } else if version >= 1 && (construction_method == ConstructionMethod::IdatOffset) {
+            for extent in extent_list {
+                let offset = base_offset + extent.extent_offset;
+                if total_length + extent.extent_length > max_size {
+                    return Err(HeifError::FileRead);
+                }
+                let mut memory_buf =
+                    match metabox.item_data_box().read(offset, extent.extent_length) {
+                        Some(m) => m,
+                        None => return Err(HeifError::FileRead),
+                    };
+                res.append(&mut memory_buf.to_vec());
+                total_length += extent.extent_length;
+            }
+        } else if version >= 1 && (construction_method == ConstructionMethod::ItemOffset) {
+            unimplemented!("itemoffset")
+        } else {
+            return Err(HeifError::FileRead);
+        }
+        Ok(res)
     }
 
     fn process_item_properties(&self, context_id: u32) -> Result<Properties> {
@@ -528,7 +606,7 @@ impl HeifReader {
                 let id: Id = (context_id, image_id);
                 let hvcc_index = iprp.find_property_index(PropertyType::HVCC, image_id);
                 let avcc_index = iprp.find_property_index(PropertyType::AVCC, image_id);
-                let mut config_index: Id = (0, 0);
+                let mut config_index: Id;
                 if hvcc_index != 0 {
                     config_index = (context_id, hvcc_index);
                 } else if avcc_index != 0 {
@@ -539,7 +617,7 @@ impl HeifReader {
                 }
                 if let Some(prop) = iprp.property_by_index(config_index.1 as usize - 1) {
                     if let Some(hevc_box) = prop.as_any().downcast_ref::<HevcConfigurationBox>() {
-                        let config_index: Id = (context_id, hvcc_index);
+                        config_index = (context_id, hvcc_index);
                         if self.parameter_set_map.get(&config_index).is_none() {
                             self.parameter_set_map.insert(
                                 config_index,
@@ -704,7 +782,7 @@ impl HeifReader {
 
         let iloc = metabox.item_location_box();
         let version = iloc.full_box_header().version();
-        let item_location = match iloc.find_item(item_id) {
+        let item_location = match iloc.item_location_by_id(item_id) {
             Some(i) => i,
             None => return Err(HeifError::InvalidItemID),
         };
@@ -713,7 +791,7 @@ impl HeifReader {
             return Err(HeifError::FileRead);
         }
         let mut item_length = 0;
-        if version >= 1 && (*item_location.method() == ConstructionMethod::ItemOffset) {
+        if version >= 1 && (item_location.construction_method() == ConstructionMethod::ItemOffset) {
             let all_iloc_references = metabox
                 .item_reference_box()
                 .references_of_type("iloc".parse().unwrap());

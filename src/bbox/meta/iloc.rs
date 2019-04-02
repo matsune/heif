@@ -20,7 +20,7 @@ impl Default for ItemLocationExtent {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ConstructionMethod {
     FileOffset,
     IdatOffset,
@@ -67,11 +67,11 @@ impl ItemLocation {
         self.item_id = id;
     }
 
-    pub fn method(&self) -> &ConstructionMethod {
-        &self.method
+    pub fn construction_method(&self) -> ConstructionMethod {
+        self.method
     }
 
-    pub fn set_method(&mut self, m: ConstructionMethod) {
+    pub fn set_construction_method(&mut self, m: ConstructionMethod) {
         self.method = m;
     }
 
@@ -238,17 +238,13 @@ impl ItemLocationBox {
     }
 
     pub fn add_location(&mut self, loc: ItemLocation) {
-        if *loc.method() != ConstructionMethod::FileOffset {
+        if loc.construction_method() != ConstructionMethod::FileOffset {
             self.full_box_header.set_version(1);
         }
         self.locations.push(loc);
     }
 
-    pub fn has_item_id_entry(&self, item_id: u32) -> bool {
-        self.find_item(item_id).is_some()
-    }
-
-    pub fn find_item(&self, item_id: u32) -> Option<&ItemLocation> {
+    pub fn item_location_by_id(&self, item_id: u32) -> Option<&ItemLocation> {
         self.locations.iter().find(|l| l.item_id() == item_id)
     }
 }
