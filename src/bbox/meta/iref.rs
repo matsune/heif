@@ -3,8 +3,6 @@ use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::{HeifError, Result};
 
-use std::str::FromStr;
-
 #[derive(Debug)]
 pub struct ItemReferenceBox {
     full_box_header: FullBoxHeader,
@@ -64,13 +62,13 @@ impl ItemReferenceBox {
 
     pub fn add(&mut self, box_type: Byte4, from_id: u32, to_id: u32) -> Result<()> {
         let is_large = self.full_box_header.version() != 0;
-        if ((from_id > std::u16::MAX.into() || to_id > std::u16::MAX.into()) && !is_large) {
+        if (from_id > std::u16::MAX.into() || to_id > std::u16::MAX.into()) && !is_large {
             return Err(HeifError::InvalidItemID);
         }
         if let Some(item_ref) = self
             .reference_list
             .iter_mut()
-            .find(|i| *i.box_header().box_type() == box_type && i.from_item_id() == from_id)
+            .find(|i| *i.box_header().box_type() == box_type && i.get_from_item_id() == from_id)
         {
             item_ref.add_to_item_id(to_id);
         } else {
@@ -137,7 +135,7 @@ impl SingleItemTypeReferenceBox {
         self.box_header.set_box_type(r_type);
     }
 
-    pub fn from_item_id(&self) -> u32 {
+    pub fn get_from_item_id(&self) -> u32 {
         self.from_item_id
     }
 

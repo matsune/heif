@@ -9,8 +9,8 @@ pub struct FileFeature {
 }
 
 impl FileFeature {
-    pub fn has_feature(&self, feature: &FileFeatureEnum) -> bool {
-        self.file_feature_set.contains(feature)
+    pub fn has_feature(&self, feature: FileFeatureEnum) -> bool {
+        self.file_feature_set.contains(&feature)
     }
 
     pub fn set_feature(&mut self, feature: FileFeatureEnum) {
@@ -32,8 +32,8 @@ pub struct TrackFeature {
 }
 
 impl TrackFeature {
-    pub fn has_feature(&self, feature: &TrackFeatureEnum) -> bool {
-        self.track_feature_set.contains(feature)
+    pub fn has_feature(&self, feature: TrackFeatureEnum) -> bool {
+        self.track_feature_set.contains(&feature)
     }
 
     pub fn set_feature(&mut self, feature: TrackFeatureEnum) {
@@ -55,8 +55,8 @@ pub struct MetaBoxFeature {
 }
 
 impl MetaBoxFeature {
-    pub fn has_feature(&self, feature: &MetaBoxFeatureEnum) -> bool {
-        self.meta_box_feature_set.contains(feature)
+    pub fn has_feature(&self, feature: MetaBoxFeatureEnum) -> bool {
+        self.meta_box_feature_set.contains(&feature)
     }
 
     pub fn set_feature(&mut self, feature: MetaBoxFeatureEnum) {
@@ -78,8 +78,8 @@ pub struct ItemFeature {
 }
 
 impl ItemFeature {
-    pub fn has_feature(&self, feature: &ItemFeatureEnum) -> bool {
-        self.item_feature_set.contains(feature)
+    pub fn has_feature(&self, feature: ItemFeatureEnum) -> bool {
+        self.item_feature_set.contains(&feature)
     }
 
     pub fn set_feature(&mut self, feature: ItemFeatureEnum) {

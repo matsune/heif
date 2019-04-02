@@ -1,7 +1,7 @@
 extern crate heif;
 
-use std::env;
 use heif::reader::HeifReader;
+use std::env;
 
 fn main() {
     for arg in env::args().skip(1) {

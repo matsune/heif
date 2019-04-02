@@ -3,8 +3,6 @@ use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
-use std::str::FromStr;
-
 #[derive(Debug)]
 pub struct ItemLocationExtent {
     pub extent_index: usize,
@@ -246,11 +244,11 @@ impl ItemLocationBox {
         self.locations.push(loc);
     }
 
-    pub fn has_item_id_entry(&self, item_id: &u32) -> bool {
+    pub fn has_item_id_entry(&self, item_id: u32) -> bool {
         self.find_item(item_id).is_some()
     }
 
-    pub fn find_item(&self, item_id: &u32) -> Option<&ItemLocation> {
-        self.locations.iter().find(|l| l.item_id() == *item_id)
+    pub fn find_item(&self, item_id: u32) -> Option<&ItemLocation> {
+        self.locations.iter().find(|l| l.item_id() == item_id)
     }
 }

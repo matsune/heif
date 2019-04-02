@@ -3,8 +3,6 @@ use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::{HeifError, Result};
 
-use std::str::FromStr;
-
 #[derive(Debug)]
 pub struct DataInformationBox {
     box_header: BoxHeader,
@@ -171,10 +169,11 @@ impl DataEntryBox {
         box_header: BoxHeader,
     ) -> Result<Self> {
         let full_box_header = FullBoxHeader::from_stream_header(stream, box_header)?;
-        let mut location = String::new();
-        if (full_box_header.flags() & 1) != 0 {
-            location = stream.read_zero_term_string();
-        }
+        let location = if (full_box_header.flags() & 1) != 0 {
+            stream.read_zero_term_string()
+        } else {
+            String::new()
+        };
         Ok(Self {
             full_box_header,
             location,

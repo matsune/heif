@@ -3,8 +3,6 @@ use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
-use std::str::FromStr;
-
 #[derive(Debug)]
 pub struct ItemInfoBox {
     full_box_header: FullBoxHeader,
@@ -69,8 +67,8 @@ impl ItemInfoBox {
         self.item_info_list.push(info_entry);
     }
 
-    pub fn item_by_id(&self, id: &u32) -> Option<&ItemInfoEntry> {
-        self.item_info_list.iter().find(|i| i.item_id == *id)
+    pub fn item_by_id(&self, id: u32) -> Option<&ItemInfoEntry> {
+        self.item_info_list.iter().find(|i| i.item_id == id)
     }
 
     pub fn item_by_type(&self, item_type: Byte4) -> Option<&ItemInfoEntry> {
@@ -153,8 +151,8 @@ impl ItemInfoEntry {
         &self.full_box_header
     }
 
-    pub fn item_id(&self) -> &u32 {
-        &self.item_id
+    pub fn item_id(&self) -> u32 {
+        self.item_id
     }
 
     pub fn set_item_id(&mut self, item_id: u32) {

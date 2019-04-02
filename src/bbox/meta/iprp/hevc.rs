@@ -4,8 +4,6 @@ use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
-use std::str::FromStr;
-
 #[derive(Debug)]
 pub struct HevcConfigurationBox {
     box_header: BoxHeader,
@@ -134,8 +132,8 @@ impl HevcDecoderConfigurationRecord {
         let general_profile_idc = stream.read_bits(5)? as u8;
         let general_profile_compatibility_flags = stream.read_4bytes()?.to_u32();
         let mut general_constraint_indicator_flags = [0u8; 6];
-        for i in 0..6 {
-            general_constraint_indicator_flags[i] = stream.read_byte()?;
+        for flag in general_constraint_indicator_flags.iter_mut() {
+            *flag = stream.read_byte()?;
         }
         let general_level_idc = stream.read_byte()?;
         stream.read_bits(4)?;

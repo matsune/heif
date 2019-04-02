@@ -10,8 +10,6 @@ use crate::{HeifError, Result};
 use hevc::HevcConfigurationBox;
 use ispe::ImageSpatialExtentsProperty;
 
-use std::str::FromStr;
-
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum DecoderParameterType {
     AvcSPS,
@@ -90,7 +88,7 @@ impl ItemPropertiesBox {
         self.container.property_at(idx)
     }
 
-    pub fn find_property_index(&self, p_type: PropertyType, item_id: &u32) -> u32 {
+    pub fn find_property_index(&self, p_type: PropertyType, item_id: u32) -> u32 {
         for ipma in &self.association_boxes {
             if let Some(association_entries) = ipma.get_association_entries(item_id) {
                 for entry in association_entries {
@@ -98,7 +96,7 @@ impl ItemPropertiesBox {
                         self.container.property_at(entry.index as usize - 1)
                     {
                         if self.get_property_type(item_property) == p_type {
-                            return entry.index as u32;
+                            return u32::from(entry.index);
                         }
                     }
                 }
@@ -127,7 +125,7 @@ impl ItemPropertiesBox {
         }
     }
 
-    pub fn get_item_properties(&self, item_id: &u32) -> Result<PropertyInfos> {
+    pub fn get_item_properties(&self, item_id: u32) -> Result<PropertyInfos> {
         let mut property_info_vec = PropertyInfos::new();
         for ipma in &self.association_boxes {
             if let Some(associations) = ipma.get_association_entries(item_id) {
@@ -140,7 +138,7 @@ impl ItemPropertiesBox {
                         Some(i) => i,
                         None => return Err(HeifError::Unknown("invalid property index")),
                     };
-                    let property_type = self.get_property_type(&Box::new(item_property));
+                    let property_type = self.get_property_type(item_property);
                     if property_type == PropertyType::FREE {
                         continue;
                     }
@@ -333,15 +331,13 @@ impl ItemPropertyAssociation {
         if self.full_box_header.version() == 0 && item_id > std::u16::MAX.into() {
             self.full_box_header.set_version(1);
         }
-        if (self.full_box_header.flags() & 1) == 0 {
-            if index > 127 {
-                self.full_box_header
-                    .set_flags(self.full_box_header.flags() | 1);
-            }
+        if (self.full_box_header.flags() & 1) == 0 && index > 127 {
+            self.full_box_header
+                .set_flags(self.full_box_header.flags() | 1);
         }
     }
 
-    pub fn get_association_entries(&self, item_id: &u32) -> Option<&AssociationEntries> {
-        self.associations.get(item_id)
+    pub fn get_association_entries(&self, item_id: u32) -> Option<&AssociationEntries> {
+        self.associations.get(&item_id)
     }
 }

@@ -3,8 +3,6 @@ use crate::bbox::BBox;
 use crate::bit::{Byte4, Stream};
 use crate::Result;
 
-use std::str::FromStr;
-
 #[derive(Debug)]
 pub struct GroupListBox {
     box_header: BoxHeader,

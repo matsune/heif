@@ -1,6 +1,5 @@
 use crate::bit::{Byte4, Stream};
 use crate::Result;
-use std::str::FromStr;
 
 pub trait Header {
     fn box_size(&self) -> u64;
