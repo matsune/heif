@@ -9,7 +9,7 @@ use crate::bbox::meta::iprp::ispe::ImageSpatialExtentsProperty;
 use crate::bbox::meta::iprp::{DecoderConfigurationRecord, DecoderParameterType, PropertyType};
 use crate::bbox::meta::MetaBox;
 use crate::bbox::moov::MovieBox;
-use crate::bit::{BitStream, Byte4,  Stream};
+use crate::bit::{BitStream, Byte4, Stream};
 use crate::data::*;
 use crate::internal::*;
 use crate::{HeifError, Result};
@@ -170,7 +170,7 @@ impl HeifReader {
                 let context_id = 0;
                 self.metabox_map
                     .insert(context_id, MetaBox::from_stream_header(&mut ex, header)?);
-                let metabox = self.metabox_map.get(&context_id).unwrap();
+                let metabox = &self.metabox_map[&context_id];
 
                 self.file_properties.root_meta_box_properties =
                     self.extract_metabox_properties(&metabox);
@@ -408,7 +408,8 @@ impl HeifReader {
     ) -> Result<MetaBoxInfo> {
         let mut metabox_info = MetaBoxInfo::default();
         for item in metabox.item_info_box().item_info_list() {
-            if item.item_type() == "grid" || item.item_type() == "iovl" {
+            let item_type = item.item_type();
+            if item_type == "grid" || item_type == "iovl" {
                 let i_protected = match self.get_protection(item.item_id()) {
                     Ok(b) => b,
                     Err(_) => continue,
@@ -417,14 +418,55 @@ impl HeifReader {
                     continue;
                 }
 
-                let ex_stream = self.load_item_data(stream, metabox, item.item_id())?;
-                // TODO
-                unimplemented!("extract_items {:?}", ex);
+                let mut ex_stream = self.load_item_data(stream, metabox, item.item_id())?;
+                if item_type == "grid" {
+                    let image_grid = self.parse_image_grid(&mut ex_stream)?;
+                    let image_ids = self
+                        .get_referenced_from_item_by_type(item.item_id(), "dimg".parse().unwrap());
+                    let grid = Grid {
+                        columns: u32::from(image_grid.columns_minus_one) + 1,
+                        rows: u32::from(image_grid.rows_minus_one) + 1,
+                        output_width: image_grid.output_width,
+                        output_height: image_grid.output_height,
+                        image_ids,
+                    };
+                } else {
+                    // iovl
+                    unimplemented!("extract_items iovl {:?}", ex_stream);
+                }
             }
         }
         metabox_info.properties = self.process_item_properties(context_id)?;
         metabox_info.item_info_map = self.extract_item_info_map(metabox);
         Ok(metabox_info)
+    }
+
+    fn get_referenced_from_item_by_type(&self, item_id: u32, item_type: Byte4) -> Vec<u32> {
+        unimplemented!("get_referenced_from_item_by_type")
+    }
+
+    fn parse_image_grid(&self, stream: &mut BitStream) -> Result<ImageGrid> {
+        stream.read_byte()?;
+        let read_4bytes_fields = (stream.read_byte()? & 1) != 0;
+        let rows_minus_one = stream.read_byte()?;
+        let columns_minus_one = stream.read_byte()?;
+        let (output_width, output_height) = if read_4bytes_fields {
+            (
+                stream.read_4bytes()?.to_u32(),
+                stream.read_4bytes()?.to_u32(),
+            )
+        } else {
+            (
+                stream.read_2bytes()?.to_u32(),
+                stream.read_2bytes()?.to_u32(),
+            )
+        };
+        Ok(ImageGrid {
+            rows_minus_one,
+            columns_minus_one,
+            output_width,
+            output_height,
+        })
     }
 
     fn load_item_data(
@@ -728,10 +770,8 @@ impl HeifReader {
             if let Some(item_info) = self.metabox_info.get(&context_id) {
                 if let Some(item_info) = item_info.item_info_map.get(id) {
                     let mut past_references = LinkedList::new();
-                    let metabox = self
-                        .metabox_map
-                        .get(&self.file_properties.root_meta_box_properties.context_id)
-                        .unwrap();
+                    let metabox = &self.metabox_map
+                        [&self.file_properties.root_meta_box_properties.context_id];
                     let size = self
                         .get_item_length(metabox, *id, &mut past_references)
                         .unwrap_or(0);

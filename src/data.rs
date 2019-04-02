@@ -369,3 +369,11 @@ pub struct EditList {
     pub repetitions: f64,
     pub edit_units: Vec<EditUnit>,
 }
+
+#[derive(Debug, Default)]
+pub struct ImageGrid {
+    pub rows_minus_one: u8,
+    pub columns_minus_one: u8,
+    pub output_width: u32,
+    pub output_height: u32,
+}
