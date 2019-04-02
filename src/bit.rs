@@ -323,7 +323,7 @@ impl<'a> Stream for Extract<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct BitStream {
     inner: Vec<u8>,
     bit_offset: u8,

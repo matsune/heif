@@ -12,6 +12,7 @@ pub enum HeifError {
     FileRead,
     FileHeader,
     InvalidItemID,
+    Uninitialized,
     EOF,
     Unknown(&'static str),
 }
@@ -23,6 +24,7 @@ impl HeifError {
             HeifError::FileRead => "FileRead",
             HeifError::FileHeader => "FileHeader",
             HeifError::InvalidItemID => "InvalidItemID",
+            HeifError::Uninitialized => "Uninitialized",
             HeifError::EOF => "EOF",
             HeifError::Unknown(s) => s,
         }

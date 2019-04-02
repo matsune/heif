@@ -15,8 +15,22 @@ use crate::data::*;
 use crate::internal::*;
 use crate::{HeifError, Result};
 
+#[derive(Debug, PartialEq, Eq)]
+enum State {
+    Uninitialized,
+    Initializing,
+    Ready,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        State::Uninitialized
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct HeifReader {
+    state: State,
     file_properties: FileInformationInternal,
     decoder_code_type_map: HashMap<Id, Byte4>,
     parameter_set_map: HashMap<Id, ParameterSetMap>,
@@ -30,18 +44,78 @@ pub struct HeifReader {
     track_info: HashMap<u32, TrackInfo>,
 }
 
+// accessors
 impl HeifReader {
-    pub fn load(&mut self, file_path: &str) -> Result<&mut Self> {
+    pub fn file_information(&self) -> Result<&FileInformation> {
+        if !self.is_initialized() {
+            Err(HeifError::Uninitialized)
+        } else {
+            Ok(&self.file_information)
+        }
+    }
+
+    pub fn major_brand(&self) -> Result<&Byte4> {
+        if !self.is_initialized() {
+            Err(HeifError::Uninitialized)
+        } else {
+            Ok(&self.ftyp.major_brand())
+        }
+    }
+
+    pub fn minor_version(&self) -> Result<u32> {
+        if !self.is_initialized() {
+            Err(HeifError::Uninitialized)
+        } else {
+            Ok(self.ftyp.minor_version())
+        }
+    }
+
+    pub fn compatible_brands(&self) -> Result<&Vec<Byte4>> {
+        if !self.is_initialized() {
+            Err(HeifError::Uninitialized)
+        } else {
+            Ok(self.ftyp.compatible_brands())
+        }
+    }
+}
+
+impl HeifReader {
+    pub fn load(&mut self, file_path: &str) -> Result<()> {
         let mut file = File::open(file_path).map_err(|_| HeifError::FileOpen)?;
+        self.reset();
+
         let mut stream = BitStream::from(&mut file)?;
+        self.read_stream(stream)?;
+
+        self.file_information.root_meta_box_information =
+            self.convert_root_meta_box_information(&self.file_properties.root_meta_box_properties);
+        // TODO: convertTrackInformation
+        self.file_information.features = self.file_properties.file_feature.feature_mask();
+        self.file_information.movie_timescale = self.file_properties.movie_timescale;
+
+        Ok(())
+    }
+
+    fn reset(&mut self) {
+        self.state = State::Uninitialized;
+        self.file_properties = FileInformationInternal::default();
+        self.decoder_code_type_map.clear();
+        self.parameter_set_map.clear();
+        self.image_to_parameter_set_map.clear();
+        self.primary_item_id = None;
+        self.ftyp = FileTypeBox::default();
+        self.file_information = FileInformation::default();
+        self.metabox_map.clear();
+        self.metabox_info.clear();
+        self.track_info.clear();
+    }
+
+    fn read_stream(&mut self, mut stream: BitStream) -> Result<()> {
+        self.state = State::Initializing;
+
         let mut ftyp_found = false;
         let mut metabox_found = false;
         let mut movie_found = false;
-
-        self.metabox_map.clear();
-        self.metabox_info.clear();
-        self.primary_item_id = None;
-        self.file_properties = FileInformationInternal::default();
 
         while !stream.is_eof() {
             let header = BoxHeader::from_stream(&mut stream)?;
@@ -51,6 +125,7 @@ impl HeifReader {
                     return Err(HeifError::FileRead);
                 }
                 ftyp_found = true;
+
                 let mut ex = stream.extract_from(&header)?;
                 self.ftyp = FileTypeBox::new(&mut ex, header)?;
             } else if box_type == "meta" {
@@ -58,11 +133,13 @@ impl HeifReader {
                     return Err(HeifError::FileRead);
                 }
                 metabox_found = true;
-                let context_id = 0;
+
                 let mut ex = stream.extract_from(&header)?;
+                let context_id = 0;
                 self.metabox_map
                     .insert(context_id, MetaBox::from_stream_header(&mut ex, header)?);
                 let metabox = self.metabox_map.get(&context_id).unwrap();
+
                 self.file_properties.root_meta_box_properties =
                     self.extract_metabox_properties(&metabox);
                 self.metabox_info
@@ -89,6 +166,7 @@ impl HeifReader {
                     return Err(HeifError::FileRead);
                 }
                 movie_found = true;
+
                 let mut ex = stream.extract_from(&header)?;
                 let movie_box = MovieBox::new(&mut ex, header)?;
             } else if box_type == "mdat" || box_type == "free" || box_type == "skip" {
@@ -101,14 +179,13 @@ impl HeifReader {
         if !ftyp_found || (!metabox_found && !movie_found) {
             return Err(HeifError::FileHeader);
         }
+        self.state = State::Ready;
+        // TODO: file_features
+        Ok(())
+    }
 
-        self.file_information.root_meta_box_information =
-            self.convert_root_meta_box_information(&self.file_properties.root_meta_box_properties);
-        // TODO: convertTrackInformation
-        self.file_information.features = self.file_properties.file_feature.feature_mask();
-        self.file_information.movie_timescale = self.file_properties.movie_timescale;
-
-        Ok(self)
+    fn is_initialized(&self) -> bool {
+        self.state != State::Uninitialized
     }
 
     fn extract_metabox_properties(&self, metabox: &MetaBox) -> MetaBoxProperties {
@@ -442,6 +519,7 @@ impl HeifReader {
                 if hvcc_index != 0 {
                     config_index = (*context_id, hvcc_index);
                 } else if avcc_index != 0 {
+                    // TODO
                     unimplemented!("avcc_index");
                 } else {
                     continue;
@@ -530,12 +608,15 @@ impl HeifReader {
         items
     }
 
-    fn is_valid_item(&self, image_id: &u32) -> bool {
+    fn is_valid_item(&self, image_id: &u32) -> Result<bool> {
+        if !self.is_initialized() {
+            return Err(HeifError::Uninitialized);
+        }
         let root_meta_id = self.file_properties.root_meta_box_properties.context_id;
         if let Some(root) = self.metabox_map.get(&root_meta_id) {
-            root.item_info_box().item_by_id(image_id).is_some()
+            Ok(root.item_info_box().item_by_id(image_id).is_some())
         } else {
-            false
+            Ok(false)
         }
     }
 
@@ -588,7 +669,7 @@ impl HeifReader {
         item_id: &u32,
         past_references: &mut LinkedList<u32>,
     ) -> Result<usize> {
-        if self.is_valid_item(&item_id) {
+        if !self.is_valid_item(&item_id)? {
             return Err(HeifError::InvalidItemID);
         }
 

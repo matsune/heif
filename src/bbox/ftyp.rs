@@ -5,10 +5,10 @@ use crate::Result;
 
 #[derive(Debug)]
 pub struct FileTypeBox {
-    pub box_header: BoxHeader,
-    pub major_brand: Byte4,
-    pub minor_version: u32,
-    pub compatibles: Vec<String>,
+    box_header: BoxHeader,
+    major_brand: Byte4,
+    minor_version: u32,
+    compatible_brands: Vec<Byte4>,
 }
 
 impl std::default::Default for FileTypeBox {
@@ -17,7 +17,7 @@ impl std::default::Default for FileTypeBox {
             box_header: BoxHeader::new("ftyp".parse().unwrap()),
             major_brand: Byte4::default(),
             minor_version: 0,
-            compatibles: Vec::new(),
+            compatible_brands: Vec::new(),
         }
     }
 }
@@ -37,15 +37,45 @@ impl FileTypeBox {
         let box_header = box_header;
         let major_brand = stream.read_4bytes()?;
         let minor_version = stream.read_4bytes()?.to_u32();
-        let mut compatibles = Vec::new();
+        let mut compatible_brands = Vec::new();
         while !stream.is_eof() {
-            compatibles.push(stream.read_4bytes()?.to_string());
+            compatible_brands.push(stream.read_4bytes()?);
         }
         Ok(Self {
             box_header,
             major_brand,
             minor_version,
-            compatibles,
+            compatible_brands,
         })
+    }
+
+    pub fn major_brand(&self) -> &Byte4 {
+        &self.major_brand
+    }
+
+    pub fn set_major_brand(&mut self, brand: Byte4) {
+        self.major_brand = brand;
+    }
+
+    pub fn minor_version(&self) -> u32 {
+        self.minor_version
+    }
+
+    pub fn set_minor_version(&mut self, ver: u32) {
+        self.minor_version = ver;
+    }
+
+    pub fn add_compatible_brand(&mut self, brand: Byte4) {
+        if !self.is_compatible_brand(&brand) {
+            self.compatible_brands.push(brand);
+        }
+    }
+
+    pub fn compatible_brands(&self) -> &Vec<Byte4> {
+        &self.compatible_brands
+    }
+
+    pub fn is_compatible_brand(&self, brand: &Byte4) -> bool {
+        self.compatible_brands.contains(brand)
     }
 }

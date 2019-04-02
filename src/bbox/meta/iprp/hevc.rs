@@ -138,15 +138,15 @@ impl HevcDecoderConfigurationRecord {
             general_constraint_indicator_flags[i] = stream.read_byte()?;
         }
         let general_level_idc = stream.read_byte()?;
-        stream.read_bits(4);
+        stream.read_bits(4)?;
         let min_spatial_segmentation_idc = stream.read_bits(12)? as u16;
-        stream.read_bits(6);
+        stream.read_bits(6)?;
         let parallelism_type = stream.read_bits(2)? as u8;
-        stream.read_bits(6);
+        stream.read_bits(6)?;
         let chroma_format = stream.read_bits(2)? as u8;
-        stream.read_bits(5);
+        stream.read_bits(5)?;
         let bit_depth_luma_minus8 = stream.read_bits(3)? as u8;
-        stream.read_bits(5);
+        stream.read_bits(5)?;
         let bit_depth_chroma_minus8 = stream.read_bits(3)? as u8;
         let avg_frame_rate = stream.read_2bytes()?.to_u16();
         let constant_frame_rate = stream.read_bits(2)? as u8;
@@ -182,7 +182,7 @@ impl HevcDecoderConfigurationRecord {
         let num_arrays = stream.read_byte()?;
         for _ in 0..num_arrays {
             let array_completeness = stream.read_bits(1)? != 0;
-            stream.read_bits(1);
+            stream.read_bits(1)?;
             let nal_unit_type = HevcNalUnitType::from_u8(stream.read_bits(6)? as u8);
             let num_nalus = stream.read_2bytes()?.to_u16();
             for _ in 0..num_nalus {
