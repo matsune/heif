@@ -402,10 +402,7 @@ mod tests {
 
         #[test]
         fn test_from_str() {
-            assert_eq!(
-                Byte4::from_str("abcd").unwrap(),
-                Byte4(0x61, 0x62, 0x63, 0x64)
-            );
+            assert_eq!("abcd".parse().unwrap(), Byte4(0x61, 0x62, 0x63, 0x64));
             assert!(Byte4::from_str("a").is_err());
             assert!(Byte4::from_str("abcde").is_err());
         }

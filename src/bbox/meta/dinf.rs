@@ -14,7 +14,7 @@ pub struct DataInformationBox {
 impl Default for DataInformationBox {
     fn default() -> Self {
         Self {
-            box_header: BoxHeader::new(Byte4::from_str("dinf").unwrap()),
+            box_header: BoxHeader::new("dinf".parse().unwrap()),
             data_reference_box: DataReferenceBox::default(),
         }
     }
@@ -78,7 +78,7 @@ impl BBox for DataReferenceBox {
 impl Default for DataReferenceBox {
     fn default() -> Self {
         Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("dref").unwrap(), 0, 0),
+            full_box_header: FullBoxHeader::new("dref".parse().unwrap(), 0, 0),
             data_entries: Vec::new(),
         }
     }
@@ -145,11 +145,11 @@ impl DataEntryBox {
     }
 
     pub fn new_urn() -> Self {
-        Self::new(Byte4::from_str("urn ").unwrap(), 0, 0)
+        Self::new("urn ".parse().unwrap(), 0, 0)
     }
 
     pub fn new_url(is_self_contained: bool) -> Self {
-        Self::new(Byte4::from_str("url ").unwrap(), 0, 0)
+        Self::new("url ".parse().unwrap(), 0, 0)
     }
 
     pub fn from_stream_header_urn<T: Stream>(

@@ -14,7 +14,7 @@ pub struct ItemDataBox {
 impl Default for ItemDataBox {
     fn default() -> Self {
         Self {
-            box_header: BoxHeader::new(Byte4::from_str("idat").unwrap()),
+            box_header: BoxHeader::new("idat".parse().unwrap()),
             data: Vec::new(),
         }
     }

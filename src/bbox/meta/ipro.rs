@@ -14,7 +14,7 @@ pub struct ItemProtectionBox {
 impl Default for ItemProtectionBox {
     fn default() -> Self {
         Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("ipro").unwrap(), 0, 0),
+            full_box_header: FullBoxHeader::new("ipro".parse().unwrap(), 0, 0),
             protection_info: Vec::new(),
         }
     }

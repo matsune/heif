@@ -66,7 +66,7 @@ impl BoxHeader {
     }
 
     pub fn set_user_type(&mut self, u: Vec<u8>) {
-        self.set_box_type(Byte4::from_str("uuid").unwrap());
+        self.set_box_type("uuid".parse().unwrap());
         self.user_type = u
     }
 
@@ -151,7 +151,7 @@ impl FullBoxHeader {
     }
 
     pub fn set_user_type(&mut self, u: Vec<u8>) {
-        self.set_box_type(Byte4::from_str("uuid").unwrap());
+        self.set_box_type("uuid".parse().unwrap());
         self.user_type = u
     }
 

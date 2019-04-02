@@ -14,7 +14,7 @@ pub struct ItemReferenceBox {
 impl Default for ItemReferenceBox {
     fn default() -> Self {
         Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("iref").unwrap(), 0, 0),
+            full_box_header: FullBoxHeader::new("iref".parse().unwrap(), 0, 0),
             reference_list: Vec::new(),
         }
     }

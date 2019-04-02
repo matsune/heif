@@ -45,7 +45,7 @@ pub struct MetaBox {
 impl Default for MetaBox {
     fn default() -> Self {
         Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("meta").unwrap(), 0, 0),
+            full_box_header: FullBoxHeader::new("meta".parse().unwrap(), 0, 0),
             handler_box: HandlerBox::default(),
             primary_item_box: PrimaryItemBox::default(),
             item_location_box: ItemLocationBox::default(),

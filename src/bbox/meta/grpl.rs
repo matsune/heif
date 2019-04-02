@@ -14,7 +14,7 @@ pub struct GroupListBox {
 impl Default for GroupListBox {
     fn default() -> Self {
         Self {
-            box_header: BoxHeader::new(Byte4::from_str("grpl").unwrap()),
+            box_header: BoxHeader::new("grpl".parse().unwrap()),
             entity_to_group_box_vector: Vec::new(),
         }
     }

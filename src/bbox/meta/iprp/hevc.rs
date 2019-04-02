@@ -31,7 +31,7 @@ impl BBox for HevcConfigurationBox {
 impl HevcConfigurationBox {
     pub fn new(hevc_config: HevcDecoderConfigurationRecord) -> Self {
         Self {
-            box_header: BoxHeader::new(Byte4::from_str("hvcC").unwrap()),
+            box_header: BoxHeader::new("hvcC".parse().unwrap()),
             hevc_config,
         }
     }

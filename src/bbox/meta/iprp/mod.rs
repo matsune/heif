@@ -38,7 +38,7 @@ pub struct ItemPropertiesBox {
 impl Default for ItemPropertiesBox {
     fn default() -> Self {
         Self {
-            box_header: BoxHeader::new(Byte4::from_str("iprp").unwrap()),
+            box_header: BoxHeader::new("iprp".parse().unwrap()),
             container: ItemPropertyContainer::default(),
             association_boxes: Vec::new(),
         }
@@ -200,7 +200,7 @@ impl std::fmt::Debug for ItemPropertyContainer {
 impl Default for ItemPropertyContainer {
     fn default() -> Self {
         Self {
-            box_header: BoxHeader::new(Byte4::from_str("ipco").unwrap()),
+            box_header: BoxHeader::new("ipco".parse().unwrap()),
             properties: Vec::new(),
         }
     }
@@ -274,7 +274,7 @@ const PROPERTY_INDEX_WIDTH_SMALL: usize = 7;
 impl Default for ItemPropertyAssociation {
     fn default() -> Self {
         Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("ipma").unwrap(), 0, 0),
+            full_box_header: FullBoxHeader::new("ipma".parse().unwrap(), 0, 0),
             associations: HashMap::new(),
         }
     }

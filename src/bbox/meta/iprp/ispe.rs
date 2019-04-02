@@ -31,7 +31,7 @@ impl BBox for ImageSpatialExtentsProperty {
 impl ImageSpatialExtentsProperty {
     pub fn new(width: u32, height: u32) -> Self {
         Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("ispe").unwrap(), 0, 0),
+            full_box_header: FullBoxHeader::new("ispe".parse().unwrap(), 0, 0),
             width,
             height,
         }

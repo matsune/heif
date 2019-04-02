@@ -25,7 +25,7 @@ impl BBox for HandlerBox {
 impl Default for HandlerBox {
     fn default() -> Self {
         Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("hdlr").unwrap(), 0, 0),
+            full_box_header: FullBoxHeader::new("hdlr".parse().unwrap(), 0, 0),
             handler_type: Byte4::default(),
             name: String::new(),
         }

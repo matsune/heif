@@ -13,6 +13,7 @@ pub enum HeifError {
     FileHeader,
     InvalidItemID,
     Uninitialized,
+    NotApplicable,
     EOF,
     Unknown(&'static str),
 }
@@ -25,6 +26,7 @@ impl HeifError {
             HeifError::FileHeader => "FileHeader",
             HeifError::InvalidItemID => "InvalidItemID",
             HeifError::Uninitialized => "Uninitialized",
+            HeifError::NotApplicable => "NotApplicable",
             HeifError::EOF => "EOF",
             HeifError::Unknown(s) => s,
         }

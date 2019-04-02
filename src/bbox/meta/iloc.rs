@@ -117,7 +117,7 @@ pub struct ItemLocationBox {
 impl Default for ItemLocationBox {
     fn default() -> Self {
         Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("iloc").unwrap(), 0, 0),
+            full_box_header: FullBoxHeader::new("iloc".parse().unwrap(), 0, 0),
             offset_size: 4,
             length_size: 4,
             base_offset_size: 4,

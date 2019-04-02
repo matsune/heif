@@ -30,7 +30,7 @@ impl BBox for ItemInfoBox {
 impl ItemInfoBox {
     pub fn new(version: u8) -> Self {
         Self {
-            full_box_header: FullBoxHeader::new(Byte4::from_str("iinf").unwrap(), version, 0),
+            full_box_header: FullBoxHeader::new("iinf".parse().unwrap(), version, 0),
             item_info_list: Vec::new(),
         }
     }

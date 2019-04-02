@@ -40,7 +40,7 @@ pub struct HeifReader {
     file_information: FileInformation,
     metabox_map: HashMap<u32, MetaBox>,
     metabox_info: HashMap<u32, MetaBoxInfo>,
-    // matrix: Vec<i32>,
+    matrix: Vec<i32>,
     track_info: HashMap<u32, TrackInfo>,
 }
 
@@ -77,6 +77,40 @@ impl HeifReader {
             Ok(self.ftyp.compatible_brands())
         }
     }
+
+    pub fn display_width(&self, sequence_id: &u32) -> Result<u32> {
+        if !self.is_valid_track(sequence_id)? {
+            return Err(HeifError::InvalidItemID);
+        }
+        if let Some(info) = self.track_info.get(sequence_id) {
+            Ok(info.width)
+        } else {
+            Err(HeifError::InvalidItemID)
+        }
+    }
+
+    pub fn display_height(&self, sequence_id: &u32) -> Result<u32> {
+        if !self.is_valid_track(sequence_id)? {
+            return Err(HeifError::InvalidItemID);
+        }
+        if let Some(info) = self.track_info.get(sequence_id) {
+            Ok(info.height)
+        } else {
+            Err(HeifError::InvalidItemID)
+        }
+    }
+
+    pub fn matrix(&self) -> Result<&Vec<i32>> {
+        if !self.is_initialized() {
+            Err(HeifError::Uninitialized)
+        } else {
+            if self.matrix.is_empty() {
+                Err(HeifError::NotApplicable)
+            } else {
+                Ok(&self.matrix)
+            }
+        }
+    }
 }
 
 impl HeifReader {
@@ -107,6 +141,7 @@ impl HeifReader {
         self.file_information = FileInformation::default();
         self.metabox_map.clear();
         self.metabox_info.clear();
+        self.matrix.clear();
         self.track_info.clear();
     }
 
@@ -227,32 +262,20 @@ impl HeifReader {
                 if item.item_protection_index() > 0 {
                     item_features.set_feature(ItemFeatureEnum::IsProtected);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("thmb").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "thmb".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::IsThumbnailImage);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("auxl").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "auxl".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::IsAuxiliaryImage);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("base").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "base".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::IsPreComputedDerivedImage);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("dimg").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "dimg".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::IsDerivedImage);
                 }
                 if !item_features.has_feature(&ItemFeatureEnum::IsThumbnailImage)
@@ -260,46 +283,28 @@ impl HeifReader {
                 {
                     item_features.set_feature(ItemFeatureEnum::IsMasterImage);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("thmb").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "thmb".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::HasLinkedThumbnails);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("auxl").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "auxl".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::HasLinkedAuxiliaryImage);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("cdsc").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "cdsc".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::HasLinkedMetadata);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("base").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "base".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::HasLinkedPreComputedDerivedImage);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("tbas").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "tbas".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::HasLinkedTiles);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("dimg").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "dimg".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::HasLinkedDerivedImage);
                 }
 
@@ -315,11 +320,8 @@ impl HeifReader {
                 if item.item_protection_index() > 0 {
                     item_features.set_feature(ItemFeatureEnum::IsProtected);
                 }
-                if self.do_references_from_item_id_exist(
-                    metabox,
-                    item_id,
-                    Byte4::from_str("cdsc").unwrap(),
-                ) {
+                if self.do_references_from_item_id_exist(metabox, item_id, "cdsc".parse().unwrap())
+                {
                     item_features.set_feature(ItemFeatureEnum::IsMetadataItem);
                 }
                 if item_type == "Exif" {
@@ -535,7 +537,7 @@ impl HeifReader {
                         }
                         self.image_to_parameter_set_map.insert(id, config_index);
                         self.decoder_code_type_map
-                            .insert(id, Byte4::from_str("hvc1").unwrap());
+                            .insert(id, "hvc1".parse().unwrap());
                     }
                 }
             }
@@ -580,11 +582,11 @@ impl HeifReader {
                         if !self.do_references_from_item_id_exist(
                             m,
                             item_id,
-                            Byte4::from_str("auxl").unwrap(),
+                            "auxl".parse().unwrap(),
                         ) && !self.do_references_from_item_id_exist(
                             m,
                             item_id,
-                            Byte4::from_str("thmb").unwrap(),
+                            "thmb".parse().unwrap(),
                         ) {
                             master_item_ids.push(item_id);
                         }
@@ -620,8 +622,11 @@ impl HeifReader {
         }
     }
 
-    fn is_valid_track(&self, sequence_id: &u32) -> bool {
-        self.track_info.contains_key(sequence_id)
+    fn is_valid_track(&self, sequence_id: &u32) -> Result<bool> {
+        if !self.is_initialized() {
+            return Err(HeifError::Uninitialized);
+        }
+        Ok(self.track_info.contains_key(sequence_id))
     }
 
     fn convert_root_meta_box_information(
@@ -701,7 +706,7 @@ impl HeifReader {
         if version >= 1 && (*item_location.method() == ConstructionMethod::ItemOffset) {
             let all_iloc_references = metabox
                 .item_reference_box()
-                .references_of_type(Byte4::from_str("iloc").unwrap());
+                .references_of_type("iloc".parse().unwrap());
             let to_item_ids = match all_iloc_references
                 .iter()
                 .find(|item| item.from_item_id() == *item_id)
@@ -777,13 +782,13 @@ type SampleInfoVector = Vec<SampleInfo>;
 
 #[derive(Debug)]
 struct TrackInfo {
-    samples: SampleInfoVector,
-    width: u32,
-    height: u32,
-    matrix: Vec<i32>,
-    duration: f64,
+    pub samples: SampleInfoVector,
+    pub width: u32,
+    pub height: u32,
+    pub matrix: Vec<i32>,
+    pub duration: f64,
     // TODO: pMap
-    clap_properties: HashMap<u32, CleanAperture>,
-    auxi_properties: HashMap<u32, AuxiliaryType>,
-    repetitions: f64,
+    pub clap_properties: HashMap<u32, CleanAperture>,
+    pub auxi_properties: HashMap<u32, AuxiliaryType>,
+    pub repetitions: f64,
 }
