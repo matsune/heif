@@ -166,7 +166,7 @@ pub struct PropertyInfo {
 
 pub type PropertyInfos = Vec<PropertyInfo>;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PropertyType {
     RAW,
     AUXC,

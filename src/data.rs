@@ -1,6 +1,8 @@
 use crate::bit::Byte4;
 use crate::internal::Groupings;
 
+use crate::bbox::meta::iprp::{DecoderParameterType, PropertyType};
+
 #[derive(Debug)]
 pub enum TrackSampleType {
     OutRef,
@@ -27,6 +29,26 @@ pub enum ItemPropertyType {
     PASP,
     PIXI,
     RLOC,
+}
+
+impl ItemPropertyType {
+    pub fn from(prop_type: PropertyType) -> Self {
+        match prop_type {
+            PropertyType::AUXC => ItemPropertyType::AUXC,
+            PropertyType::AVCC => ItemPropertyType::AVCC,
+            PropertyType::CLAP => ItemPropertyType::CLAP,
+            PropertyType::COLR => ItemPropertyType::COLR,
+            PropertyType::HVCC => ItemPropertyType::HVCC,
+            PropertyType::IMIR => ItemPropertyType::IMIR,
+            PropertyType::IROT => ItemPropertyType::IROT,
+            PropertyType::ISPE => ItemPropertyType::ISPE,
+            PropertyType::JPGC => ItemPropertyType::JPGC,
+            PropertyType::PASP => ItemPropertyType::PASP,
+            PropertyType::PIXI => ItemPropertyType::PIXI,
+            PropertyType::RLOC => ItemPropertyType::RLOC,
+            _ => ItemPropertyType::RAW,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -243,6 +265,19 @@ pub enum DecoderSpecInfoType {
     HevcPPS = 34,
 
     AudioSpecificConfig = 35,
+}
+
+impl DecoderSpecInfoType {
+    pub fn from(param_type: DecoderParameterType) -> Self {
+        match param_type {
+            DecoderParameterType::AvcSPS => DecoderSpecInfoType::AvcSPS,
+            DecoderParameterType::AvcPPS => DecoderSpecInfoType::AvcPPS,
+            DecoderParameterType::HevcVPS => DecoderSpecInfoType::HevcVPS,
+            DecoderParameterType::HevcSPS => DecoderSpecInfoType::HevcSPS,
+            DecoderParameterType::HevcPPS => DecoderSpecInfoType::HevcPPS,
+            DecoderParameterType::AudioSpecificConfig => DecoderSpecInfoType::AudioSpecificConfig,
+        }
+    }
 }
 
 #[derive(Debug)]

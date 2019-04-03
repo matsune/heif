@@ -7,7 +7,7 @@ use crate::bbox::meta::iinf::ItemInfoEntry;
 use crate::bbox::meta::iloc::ConstructionMethod;
 use crate::bbox::meta::iprp::hevc::HevcConfigurationBox;
 use crate::bbox::meta::iprp::ispe::ImageSpatialExtentsProperty;
-use crate::bbox::meta::iprp::{DecoderConfigurationRecord, DecoderParameterType, PropertyType};
+use crate::bbox::meta::iprp::{DecoderConfigurationRecord, PropertyType};
 use crate::bbox::meta::MetaBox;
 use crate::bbox::moov::MovieBox;
 use crate::bit::{BitStream, Byte4, Stream};
@@ -164,21 +164,21 @@ impl HeifReader {
             .image_item_ids()?
             .into_iter()
             .filter(|item_id| {
-                if let Ok(item_info_entry) = self.get_item_by_image_id(*item_id) {
-                    let ty = item_info_entry.item_type().to_string();
-                    (ty == "avc1" || ty == "hvc1")
-                        && (!self.do_references_from_item_id_exist(
-                            root_metabox,
-                            *item_id,
-                            "auxl".parse().unwrap(),
-                        ) && !self.do_references_from_item_id_exist(
-                            root_metabox,
-                            *item_id,
-                            "thmb".parse().unwrap(),
-                        ))
-                } else {
-                    false
-                }
+                let ty = self
+                    .get_item_by_image_id(*item_id)
+                    .unwrap()
+                    .item_type()
+                    .to_string();
+                (ty == "avc1" || ty == "hvc1")
+                    && (!self.do_references_from_item_id_exist(
+                        root_metabox,
+                        *item_id,
+                        "auxl".parse().unwrap(),
+                    ) && !self.do_references_from_item_id_exist(
+                        root_metabox,
+                        *item_id,
+                        "thmb".parse().unwrap(),
+                    ))
             })
             .collect())
     }
@@ -203,7 +203,7 @@ impl HeifReader {
         println!(">> decoderCodeTypeMap: {:?}\n", self.decoder_code_type_map);
         println!(">> parameterSetMap: {:?}\n", self.parameter_set_map);
         println!(
-            "image>> ToParameterSetMap: {:?}\n",
+            ">> imageToParameterSetMap: {:?}\n",
             self.image_to_parameter_set_map
         );
         println!(">> ftyp: {:?}\n", self.ftyp);
@@ -479,8 +479,11 @@ impl HeifReader {
         item_id: u32,
         ref_type: Byte4,
     ) -> bool {
-        let refs = metabox.item_reference_box().references_of_type(ref_type);
-        refs.iter().any(|r| r.get_from_item_id() == item_id)
+        metabox
+            .item_reference_box()
+            .references_of_type(ref_type)
+            .iter()
+            .any(|r| r.get_from_item_id() == item_id)
     }
 
     fn extract_items(
@@ -639,21 +642,20 @@ impl HeifReader {
 
     fn process_item_properties(&self, context_id: u32) -> Result<Properties> {
         let mut propety_map = Properties::default();
-        if let Some(m) = self.metabox_map.get(&context_id) {
-            let iprp = m.item_properties_box();
-            let item_ids = m.item_info_box().item_ids();
-            for item_id in item_ids {
-                let mut property_type_vector = Vec::new();
-                let property_vector = iprp.get_item_properties(item_id)?;
-                for prop in &property_vector {
-                    property_type_vector.push(ItemPropertyInfo {
-                        item_property_type: self
-                            .item_property_type_from_property_type(&prop.property_type),
-                        index: prop.index,
-                        is_essential: prop.is_essential,
-                    })
-                }
-                propety_map.insert(item_id, property_type_vector);
+        if let Some(metabox) = self.metabox_map.get(&context_id) {
+            let iprp = metabox.item_properties_box();
+            for item_id in metabox.item_info_box().item_ids() {
+                propety_map.insert(
+                    item_id,
+                    iprp.get_item_properties(item_id)?
+                        .iter()
+                        .map(|prop| ItemPropertyInfo {
+                            item_property_type: ItemPropertyType::from(prop.property_type.clone()),
+                            index: prop.index,
+                            is_essential: prop.is_essential,
+                        })
+                        .collect(),
+                );
             }
         }
         Ok(propety_map)
@@ -687,24 +689,6 @@ impl HeifReader {
             }
         }
         item_info_map
-    }
-
-    fn item_property_type_from_property_type(&self, ty: &PropertyType) -> ItemPropertyType {
-        match ty {
-            PropertyType::AUXC => ItemPropertyType::AUXC,
-            PropertyType::AVCC => ItemPropertyType::AVCC,
-            PropertyType::CLAP => ItemPropertyType::CLAP,
-            PropertyType::COLR => ItemPropertyType::COLR,
-            PropertyType::HVCC => ItemPropertyType::HVCC,
-            PropertyType::IMIR => ItemPropertyType::IMIR,
-            PropertyType::IROT => ItemPropertyType::IROT,
-            PropertyType::ISPE => ItemPropertyType::ISPE,
-            PropertyType::JPGC => ItemPropertyType::JPGC,
-            PropertyType::PASP => ItemPropertyType::PASP,
-            PropertyType::PIXI => ItemPropertyType::PIXI,
-            PropertyType::RLOC => ItemPropertyType::RLOC,
-            _ => ItemPropertyType::RAW,
-        }
     }
 
     fn get_decoder_code_type(&self, item_id: u32) -> Byte4 {
@@ -765,22 +749,13 @@ impl HeifReader {
     ) -> ParameterSetMap {
         let mut pm = ParameterSetMap::default();
         for (k, v) in record.configuration_map().into_iter() {
-            let ty = match k {
-                DecoderParameterType::AvcSPS => DecoderSpecInfoType::AvcSPS,
-                DecoderParameterType::AvcPPS => DecoderSpecInfoType::AvcPPS,
-                DecoderParameterType::HevcVPS => DecoderSpecInfoType::HevcVPS,
-                DecoderParameterType::HevcSPS => DecoderSpecInfoType::HevcSPS,
-                DecoderParameterType::HevcPPS => DecoderSpecInfoType::HevcPPS,
-                DecoderParameterType::AudioSpecificConfig => {
-                    DecoderSpecInfoType::AudioSpecificConfig
-                }
-            };
-            if let Some(m) = pm.get_mut(&ty) {
+            let spec_info_type = DecoderSpecInfoType::from(k);
+            if let Some(m) = pm.get_mut(&spec_info_type) {
                 let mut tmp = v.clone();
                 tmp.append(m);
                 *m = tmp;
             } else {
-                pm.insert(ty, v);
+                pm.insert(spec_info_type, v);
             }
         }
         pm
@@ -939,14 +914,14 @@ impl HeifReader {
             || item_type == "jpeg"
     }
 
-    // getCollectionItems
     fn image_item_ids(&self) -> Result<IdVec> {
         Ok(self
-            .root_meta_box_info()?
-            .item_info_map
+            .root_meta_box()?
+            .item_info_box()
+            .item_info_list()
             .iter()
-            .filter(|(id, item_info)| self.is_image_item_type(&item_info.item_type))
-            .map(|(id, _)| *id)
+            .filter(|item_info_entry| self.is_image_item_type(item_info_entry.item_type()))
+            .map(|item_info_entry| item_info_entry.item_id())
             .collect())
     }
 
