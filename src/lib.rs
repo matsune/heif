@@ -15,6 +15,7 @@ pub enum HeifError {
     Uninitialized,
     NotApplicable,
     InvalidSequenceID,
+    ProtectedItem,
     EOF,
     Unknown(&'static str),
 }
@@ -29,6 +30,7 @@ impl HeifError {
             HeifError::Uninitialized => "Uninitialized",
             HeifError::NotApplicable => "NotApplicable",
             HeifError::InvalidSequenceID => "InvalidSequenceID",
+            HeifError::ProtectedItem => "ProtectedItem",
             HeifError::EOF => "EOF",
             HeifError::Unknown(s) => s,
         }

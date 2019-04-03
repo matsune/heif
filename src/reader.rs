@@ -653,9 +653,21 @@ impl HeifReader {
 
     fn is_protected(&self, item_id: u32) -> Result<bool> {
         if let Some(root_metabox) = self.root_meta_box() {
-            match root_metabox.item_info_box().item_by_id(item_id) {
-                Some(e) => return Ok(e.item_protection_index() > 0),
-                None => {}
+            if let Some(e) = root_metabox.item_info_box().item_by_id(item_id) {
+                return Ok(e.item_protection_index() > 0);
+            }
+        }
+        Err(HeifError::InvalidItemID)
+    }
+
+    pub fn get_grid_item(&self, item_id: u32) -> Result<&Grid> {
+        let is_protected = self.is_protected(item_id)?;
+        if is_protected {
+            return Err(HeifError::ProtectedItem);
+        }
+        if let Some(m) = self.root_meta_box_info() {
+            if let Some(g) = m.grid_items.get(&item_id) {
+                return Ok(g);
             }
         }
         Err(HeifError::InvalidItemID)
@@ -727,7 +739,7 @@ impl HeifReader {
         pm
     }
 
-    fn get_master_image_ids(&self) -> IdVec {
+    pub fn get_master_image_ids(&self) -> IdVec {
         let mut master_item_ids = IdVec::new();
         for item_id in self.get_collection_items() {
             let root_metabox = self.root_meta_box().unwrap();
