@@ -421,8 +421,10 @@ impl HeifReader {
                 let mut ex_stream = self.load_item_data(stream, metabox, item.item_id())?;
                 if item_type == "grid" {
                     let image_grid = self.parse_image_grid(&mut ex_stream)?;
-                    let image_ids = self
-                        .get_referenced_from_item_by_type(item.item_id(), "dimg".parse().unwrap());
+                    let image_ids = self.get_referenced_from_item_list_by_type(
+                        item.item_id(),
+                        "dimg".parse().unwrap(),
+                    )?;
                     let grid = Grid {
                         columns: u32::from(image_grid.columns_minus_one) + 1,
                         rows: u32::from(image_grid.rows_minus_one) + 1,
@@ -430,6 +432,7 @@ impl HeifReader {
                         output_height: image_grid.output_height,
                         image_ids,
                     };
+                    metabox_info.grid_items.insert(item.item_id(), grid);
                 } else {
                     // iovl
                     unimplemented!("extract_items iovl {:?}", ex_stream);
@@ -441,8 +444,30 @@ impl HeifReader {
         Ok(metabox_info)
     }
 
-    fn get_referenced_from_item_by_type(&self, item_id: u32, item_type: Byte4) -> Vec<u32> {
-        unimplemented!("get_referenced_from_item_by_type")
+    fn get_referenced_from_item_list_by_type(
+        &self,
+        from_item_id: u32,
+        reference_type: Byte4,
+    ) -> Result<Vec<u32>> {
+        if !self.is_valid_image_item(from_item_id)? {
+            return Err(HeifError::InvalidItemID);
+        }
+        let item_reference_box = match self
+            .metabox_map
+            .get(&self.file_properties.root_meta_box_properties.context_id)
+        {
+            Some(i) => i.item_reference_box(),
+            None => return Err(HeifError::InvalidItemID),
+        };
+        let references = item_reference_box.references_of_type(reference_type);
+        let mut item_id_vec = IdVec::new();
+        for reference in references {
+            if reference.get_from_item_id() == from_item_id {
+                let mut to_ids = reference.to_item_ids().clone();
+                item_id_vec.append(&mut to_ids);
+            }
+        }
+        Ok(item_id_vec)
     }
 
     fn parse_image_grid(&self, stream: &mut BitStream) -> Result<ImageGrid> {
@@ -758,6 +783,22 @@ impl HeifReader {
             return Err(HeifError::Uninitialized);
         }
         Ok(self.track_info.contains_key(&sequence_id))
+    }
+
+    fn is_valid_image_item(&self, image_id: u32) -> Result<bool> {
+        if !self.is_initialized() {
+            return Err(HeifError::Uninitialized);
+        }
+        let context_id = self.file_properties.root_meta_box_properties.context_id;
+        let meta = match self.metabox_map.get(&context_id) {
+            Some(m) => m,
+            None => return Err(HeifError::InvalidItemID),
+        };
+        let item_type = match meta.item_info_box().item_by_id(image_id) {
+            Some(i) => i.item_type(),
+            None => return Err(HeifError::InvalidItemID),
+        };
+        Ok(self.is_image_item_type(item_type))
     }
 
     fn convert_root_meta_box_information(
