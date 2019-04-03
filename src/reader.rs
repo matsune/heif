@@ -203,8 +203,30 @@ impl HeifReader {
         if item.is_protected() {
             return Err(HeifError::ProtectedItem);
         }
+        let code_type = self.get_decoder_code_type(item_id)?;
+        if code_type != "hvc1" && code_type != "avc1" {
+            return Err(HeifError::UnsupportedCodeType);
+        }
+        let decoder_infos = self.get_decoder_parameter_sets(item_id)?;
+        let mut data_buf = Vec::new();
+        for config in &decoder_infos.decoder_specific_info {
+            data_buf.push(config.dec_spec_info_data);
+        }
+        data_buf.push(self.get_item_data(item_id)?);
+        println!("data_buf {:?}", data_buf);
         //TODO
         unimplemented!("get_item_data_with_decoder_parameters")
+    }
+
+    pub fn get_item_data(&self, item_id: u32) -> Result<&Vec<u8>> {
+        if !self.is_valid_item(item_id)? {
+            return Err(HeifError::InvalidItemID);
+        }
+        let mut past_references = LinkedList::new();
+        let root_metabox = self.root_meta_box()?;
+        let item_length = self.get_item_length(root_metabox, item_id, past_references)?;
+        // TODO: read_item_metabox
+        unimplemented!("get_item_data");
     }
 
     pub fn get_master_image_ids(&self) -> Result<IdVec> {
@@ -465,7 +487,9 @@ impl HeifReader {
         item_id: u32,
         max_size: usize,
     ) -> Result<Vec<u8>> {
-        self.get_item_by_image_id(item_id)?;
+        if !self.is_valid_item(item_id)? {
+            return Err(HeifError::InvalidItemID);
+        }
 
         let iloc = metabox.item_location_box();
         let version = iloc.full_box_header().version();
@@ -528,8 +552,49 @@ impl HeifReader {
         Ok(propety_map)
     }
 
-    fn get_decoder_code_type(&self, item_id: u32) -> Byte4 {
-        unimplemented!("get_decoder_code_type")
+    fn get_decoder_code_type(&self, item_id: u32) -> Result<&Byte4> {
+        if !self.is_valid_image_item(item_id)? {
+            return Err(HeifError::InvalidItemID);
+        }
+        match self.decoder_code_type_map.get(&(
+            self.file_properties.root_meta_box_properties.context_id,
+            item_id,
+        )) {
+            Some(ty) => Ok(ty),
+            None => Err(HeifError::InvalidItemID),
+        }
+    }
+
+    fn get_decoder_parameter_sets(&self, item_id: u32) -> Result<DecoderConfiguration> {
+        if !self.is_valid_image_item(item_id)? {
+            return Err(HeifError::InvalidItemID);
+        }
+        let image_full_id = (
+            self.file_properties.root_meta_box_properties.context_id,
+            item_id,
+        );
+        let parameter_set_id = match self.image_to_parameter_set_map.get(&image_full_id) {
+            Some(id) => id,
+            None => return Err(HeifError::InvalidItemID),
+        };
+        let parameter_set_map = match self.parameter_set_map.get(&parameter_set_id) {
+            Some(m) => m,
+            None => return Err(HeifError::FileHeader),
+        };
+        let decoder_config_id = parameter_set_id.1;
+        let decoder_specific_info = parameter_set_map
+            .iter()
+            .map(
+                |(dec_spec_info_type, dec_spec_info_data)| DecoderSpecificInfo {
+                    dec_spec_info_type,
+                    dec_spec_info_data,
+                },
+            )
+            .collect();
+        Ok(DecoderConfiguration {
+            decoder_config_id,
+            decoder_specific_info,
+        })
     }
 
     fn process_decoder_config_properties(&mut self, context_id: u32) {
@@ -629,7 +694,9 @@ impl HeifReader {
         item_id: u32,
         past_references: &mut LinkedList<u32>,
     ) -> Result<usize> {
-        self.get_item_by_image_id(item_id)?;
+        if !self.is_valid_item(item_id)? {
+            return Err(HeifError::InvalidItemID);
+        }
 
         let mut found = false;
         for i in past_references.iter_mut() {
@@ -721,6 +788,15 @@ impl HeifReader {
             Some(item) => Ok(item),
             None => Err(HeifError::InvalidItemID),
         }
+    }
+
+    fn is_valid_item(&self, image_id: u32) -> Result<bool> {
+        self.check_initialized(
+            self.root_meta_box()?
+                .item_info_box()
+                .item_by_id(image_id)
+                .is_some(),
+        )
     }
 
     fn is_valid_image_item(&self, image_id: u32) -> Result<bool> {

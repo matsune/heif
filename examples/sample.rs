@@ -22,5 +22,7 @@ fn main() {
         }
         println!("master_image_ids {:?}", master_image_ids);
         let first_tile_id = master_image_ids[0];
+        let data = reader.get_item_data_with_decoder_parameters(first_tile_id);
+        println!("data {:?}", data)
     }
 }

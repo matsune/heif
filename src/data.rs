@@ -109,9 +109,10 @@ pub enum ItemFeatureEnum {
     IsMPEG7Item = 1 << 19,
 }
 
-pub struct DecoderConfiguration {
+#[derive(Debug)]
+pub struct DecoderConfiguration<'a> {
     pub decoder_config_id: u32,
-    pub decoder_specific_info: Vec<DecoderSpecificInfo>,
+    pub decoder_specific_info: Vec<DecoderSpecificInfo<'a>>,
 }
 
 type FeatureBitMask = u32;
@@ -281,9 +282,9 @@ impl DecoderSpecInfoType {
 }
 
 #[derive(Debug)]
-pub struct DecoderSpecificInfo {
-    pub dec_spec_info_type: DecoderSpecInfoType,
-    pub dec_spec_info_data: Vec<u8>,
+pub struct DecoderSpecificInfo<'a> {
+    pub dec_spec_info_type: &'a DecoderSpecInfoType,
+    pub dec_spec_info_data: &'a Vec<u8>,
 }
 
 #[derive(Debug)]

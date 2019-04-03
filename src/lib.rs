@@ -16,6 +16,7 @@ pub enum HeifError {
     NotApplicable,
     InvalidSequenceID,
     ProtectedItem,
+    UnsupportedCodeType,
     EOF,
     Unknown(&'static str),
 }
@@ -31,6 +32,7 @@ impl HeifError {
             HeifError::NotApplicable => "NotApplicable",
             HeifError::InvalidSequenceID => "InvalidSequenceID",
             HeifError::ProtectedItem => "ProtectedItem",
+            HeifError::UnsupportedCodeType => "UnsupportedCodeType",
             HeifError::EOF => "EOF",
             HeifError::Unknown(s) => s,
         }
