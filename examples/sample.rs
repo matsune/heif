@@ -8,6 +8,5 @@ fn main() {
         println!("\n[{}]\n", arg);
         let mut reader = HeifReader::default();
         reader.load(arg.as_str()).unwrap();
-        println!("{:?}", reader);
     }
 }
