@@ -163,6 +163,10 @@ impl ItemInfoEntry {
         self.item_protection_index
     }
 
+    pub fn is_protected(&self) -> bool {
+        self.item_protection_index > 0
+    }
+
     pub fn set_item_protection_index(&mut self, idx: u16) {
         self.item_protection_index = idx;
     }

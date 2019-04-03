@@ -59,13 +59,6 @@ impl Byte4 {
     pub fn to_usize(&self) -> usize {
         self.to_u32() as usize
     }
-
-    pub fn to_string(&self) -> String {
-        format!(
-            "{}{}{}{}",
-            self.0 as char, self.1 as char, self.2 as char, self.3 as char
-        )
-    }
 }
 
 impl std::fmt::Debug for Byte4 {
@@ -83,6 +76,15 @@ impl FromStr for Byte4 {
             return Err(Self::Err {});
         }
         Ok(Self(bytes[0], bytes[1], bytes[2], bytes[3]))
+    }
+}
+
+impl ToString for Byte4 {
+    fn to_string(&self) -> String {
+        format!(
+            "{}{}{}{}",
+            self.0 as char, self.1 as char, self.2 as char, self.3 as char
+        )
     }
 }
 

@@ -46,33 +46,74 @@ pub struct HeifReader {
 
 // accessors
 impl HeifReader {
-    pub fn file_information(&self) -> &FileInformation {
-        &self.file_information
+    fn is_initialized(&self) -> bool {
+        self.state != State::Uninitialized
     }
 
-    pub fn major_brand(&self) -> &Byte4 {
-        self.ftyp.major_brand()
-    }
-
-    pub fn minor_version(&self) -> u32 {
-        self.ftyp.minor_version()
-    }
-
-    pub fn compatible_brands(&self) -> &Vec<Byte4> {
-        self.ftyp.compatible_brands()
-    }
-
-    pub fn display_width(&self, sequence_id: u32) -> Option<u32> {
-        match self.track_info.get(&sequence_id) {
-            Some(info) => Some(info.width),
-            None => None,
+    fn check_initialized<T>(&self, v: T) -> Result<T> {
+        if !self.is_initialized() {
+            Err(HeifError::Uninitialized)
+        } else {
+            Ok(v)
         }
     }
 
-    pub fn display_height(&self, sequence_id: u32) -> Option<u32> {
-        match self.track_info.get(&sequence_id) {
-            Some(info) => Some(info.height),
-            None => None,
+    pub fn file_information(&self) -> Result<&FileInformation> {
+        self.check_initialized(&self.file_information)
+    }
+
+    pub fn major_brand(&self) -> Result<&Byte4> {
+        self.check_initialized(&self.ftyp.major_brand())
+    }
+
+    pub fn minor_version(&self) -> Result<u32> {
+        self.check_initialized(self.ftyp.minor_version())
+    }
+
+    pub fn compatible_brands(&self) -> Result<&Vec<Byte4>> {
+        self.check_initialized(&self.ftyp.compatible_brands())
+    }
+
+    pub fn display_width(&self, sequence_id: u32) -> Result<u32> {
+        Ok(self.get_track_by_sequence_id(sequence_id)?.width)
+    }
+
+    pub fn display_height(&self, sequence_id: u32) -> Result<u32> {
+        Ok(self.get_track_by_sequence_id(sequence_id)?.height)
+    }
+
+    pub fn width(&self, item_id: u32) -> Result<u32> {
+        if let Some(info) = self.root_meta_box_info()?.item_info_map.get(&item_id) {
+            Ok(info.width)
+        } else {
+            Err(HeifError::InvalidItemID)
+        }
+    }
+
+    pub fn width_at(&self, sequence_id: u32, item_id: u32) -> Result<u32> {
+        let track = self.get_track_by_sequence_id(sequence_id)?;
+        if let Some(sample) = track.samples.get(item_id as usize) {
+            Ok(sample.width)
+        } else {
+            Err(HeifError::InvalidItemID)
+        }
+    }
+
+    pub fn height(&self, item_id: u32) -> Result<u32> {
+        let root = self.root_meta_box_info()?;
+        if let Some(info) = root.item_info_map.get(&item_id) {
+            Ok(info.height)
+        } else {
+            Err(HeifError::InvalidItemID)
+        }
+    }
+
+    pub fn height_at(&self, sequence_id: u32, item_id: u32) -> Result<u32> {
+        let track = self.get_track_by_sequence_id(sequence_id)?;
+        if let Some(sample) = track.samples.get(item_id as usize) {
+            Ok(sample.height)
+        } else {
+            Err(HeifError::InvalidItemID)
         }
     }
 
@@ -83,6 +124,68 @@ impl HeifReader {
 
 // public
 impl HeifReader {
+    pub fn grid_item_by_id(&self, item_id: u32) -> Result<&Grid> {
+        if self.is_protected(item_id)? {
+            return Err(HeifError::ProtectedItem);
+        }
+        if let Some(g) = self.root_meta_box_info()?.grid_items.get(&item_id) {
+            Ok(g)
+        } else {
+            Err(HeifError::InvalidItemID)
+        }
+    }
+
+    pub fn get_item_list_by_type(&self, item_type: Byte4) -> Result<IdVec> {
+        Ok(self
+            .image_item_ids()?
+            .into_iter()
+            .filter(|id| {
+                if let Ok(ty) = self.get_item_type(*id) {
+                    *ty == item_type
+                } else {
+                    false
+                }
+            })
+            .collect())
+    }
+
+    pub fn get_item_data_with_decoder_parameters(&self, item_id: u32) -> Result<Vec<u8>> {
+        let item = self.get_item_by_image_id(item_id)?;
+        if item.is_protected() {
+            return Err(HeifError::ProtectedItem);
+        }
+        //TODO
+        unimplemented!("get_item_data_with_decoder_parameters")
+    }
+
+    pub fn get_master_image_ids(&self) -> Result<IdVec> {
+        let root_metabox = self.root_meta_box()?;
+        Ok(self
+            .image_item_ids()?
+            .into_iter()
+            .filter(|item_id| {
+                if let Ok(item_info_entry) = self.get_item_by_image_id(*item_id) {
+                    let ty = item_info_entry.item_type().to_string();
+                    (ty == "avc1" || ty == "hvc1")
+                        && (!self.do_references_from_item_id_exist(
+                            root_metabox,
+                            *item_id,
+                            "auxl".parse().unwrap(),
+                        ) && !self.do_references_from_item_id_exist(
+                            root_metabox,
+                            *item_id,
+                            "thmb".parse().unwrap(),
+                        ))
+                } else {
+                    false
+                }
+            })
+            .collect())
+    }
+}
+
+// load
+impl HeifReader {
     pub fn load(&mut self, file_path: &str) -> Result<()> {
         let mut file = File::open(file_path).map_err(|_| HeifError::FileOpen)?;
         self.reset();
@@ -91,7 +194,7 @@ impl HeifReader {
         self.read_stream(stream)?;
 
         self.file_information.root_meta_box_information =
-            self.convert_root_meta_box_information(&self.file_properties.root_meta_box_properties);
+            self.convert_root_meta_box_information(&self.file_properties.root_meta_box_properties)?;
         // TODO: convertTrackInformation
         self.file_information.features = self.file_properties.file_feature.feature_mask();
         self.file_information.movie_timescale = self.file_properties.movie_timescale;
@@ -112,30 +215,15 @@ impl HeifReader {
         Ok(())
     }
 
-    pub fn get_item_list_by_type(&self, item_type: Byte4) -> IdVec {
-        self.get_collection_items()
-            .into_iter()
-            .filter(|id| {
-                if let Some(ty) = self.get_item_type(*id) {
-                    *ty == item_type
-                } else {
-                    false
-                }
-            })
-            .collect()
+    fn get_item_type(&self, item_id: u32) -> Result<&Byte4> {
+        let root_metabox_info = self.root_meta_box_info()?;
+        if let Some(info) = root_metabox_info.item_info_map.get(&item_id) {
+            Ok(&info.item_type)
+        } else {
+            Err(HeifError::InvalidItemID)
+        }
     }
 
-    fn get_item_type(&self, item_id: u32) -> Option<&Byte4> {
-        if let Some(root_metabox_info) = self.root_meta_box_info() {
-            if let Some(info) = root_metabox_info.item_info_map.get(&item_id) {
-                return Some(&info.item_type);
-            };
-        };
-        None
-    }
-}
-
-impl HeifReader {
     fn reset(&mut self) {
         self.state = State::Uninitialized;
         self.file_properties = FileInformationInternal::default();
@@ -190,7 +278,7 @@ impl HeifReader {
 
                 self.process_decoder_config_properties(context_id);
 
-                let master_image_ids = self.get_master_image_ids();
+                let master_image_ids = self.get_master_image_ids()?;
                 if let Some(m) = self.metabox_info.get_mut(&context_id) {
                     m.displayable_master_images = master_image_ids.len();
                 }
@@ -225,10 +313,6 @@ impl HeifReader {
         self.state = State::Ready;
         // TODO: file_features
         Ok(())
-    }
-
-    fn is_initialized(&self) -> bool {
-        self.state != State::Uninitialized
     }
 
     fn extract_metabox_properties(&self, metabox: &MetaBox) -> MetaBoxProperties {
@@ -389,16 +473,6 @@ impl HeifReader {
         meta_box_feature
     }
 
-    fn is_image_item_type(&self, item_type: &Byte4) -> bool {
-        let item_type = item_type.to_string();
-        item_type == "avc1"
-            || item_type == "hvc1"
-            || item_type == "grid"
-            || item_type == "iovl"
-            || item_type == "iden"
-            || item_type == "jpeg"
-    }
-
     fn do_references_from_item_id_exist(
         &self,
         metabox: &MetaBox,
@@ -458,13 +532,8 @@ impl HeifReader {
         from_item_id: u32,
         reference_type: Byte4,
     ) -> Result<Vec<u32>> {
-        if self.get_item_by_image_id(from_item_id).is_none() {
-            return Err(HeifError::InvalidItemID);
-        }
-        let item_reference_box = match self.root_meta_box() {
-            Some(i) => i.item_reference_box(),
-            None => return Err(HeifError::InvalidItemID),
-        };
+        self.get_item_by_image_id(from_item_id)?;
+        let item_reference_box = self.root_meta_box()?.item_reference_box();
         let references = item_reference_box.references_of_type(reference_type);
         let mut item_id_vec = IdVec::new();
         for reference in references {
@@ -526,9 +595,7 @@ impl HeifReader {
         item_id: u32,
         max_size: usize,
     ) -> Result<Vec<u8>> {
-        if self.get_item_by_image_id(item_id).is_none() {
-            return Err(HeifError::InvalidItemID);
-        }
+        self.get_item_by_image_id(item_id)?;
 
         let iloc = metabox.item_location_box();
         let version = iloc.full_box_header().version();
@@ -640,40 +707,20 @@ impl HeifReader {
         }
     }
 
+    fn get_decoder_code_type(&self, item_id: u32) -> Byte4 {
+        unimplemented!("get_decoder_code_type")
+    }
+
     fn get_sequence_items(&self, sequence_id: u32) -> Result<IdVec> {
-        match self.get_track_by_sequence_id(sequence_id) {
-            Some(track_info) => Ok(track_info
-                .samples
-                .iter()
-                .map(|s| s.decoding_order)
-                .collect()),
-            None => Err(HeifError::InvalidSequenceID),
-        }
+        Ok(self
+            .get_track_by_sequence_id(sequence_id)?
+            .samples
+            .iter()
+            .map(|s| s.decoding_order)
+            .collect())
     }
 
-    fn is_protected(&self, item_id: u32) -> Result<bool> {
-        if let Some(root_metabox) = self.root_meta_box() {
-            if let Some(e) = root_metabox.item_info_box().item_by_id(item_id) {
-                return Ok(e.item_protection_index() > 0);
-            }
-        }
-        Err(HeifError::InvalidItemID)
-    }
-
-    pub fn get_grid_item(&self, item_id: u32) -> Result<&Grid> {
-        let is_protected = self.is_protected(item_id)?;
-        if is_protected {
-            return Err(HeifError::ProtectedItem);
-        }
-        if let Some(m) = self.root_meta_box_info() {
-            if let Some(g) = m.grid_items.get(&item_id) {
-                return Ok(g);
-            }
-        }
-        Err(HeifError::InvalidItemID)
-    }
-
-    pub fn process_decoder_config_properties(&mut self, context_id: u32) {
+    fn process_decoder_config_properties(&mut self, context_id: u32) {
         if let Some(iprp) = self.metabox_map.get(&context_id) {
             let iprp = iprp.item_properties_box();
             for image_properties in &self
@@ -739,103 +786,38 @@ impl HeifReader {
         pm
     }
 
-    pub fn get_master_image_ids(&self) -> IdVec {
-        let mut master_item_ids = IdVec::new();
-        for item_id in self.get_collection_items() {
-            let root_metabox = self.root_meta_box().unwrap();
-            if let Some(item_info_entry) = root_metabox.item_info_box().item_by_id(item_id) {
-                let ty = item_info_entry.item_type().to_string();
-                if (ty == "avc1" || ty == "hvc1")
-                    && (!self.do_references_from_item_id_exist(
-                        root_metabox,
-                        item_id,
-                        "auxl".parse().unwrap(),
-                    ) && !self.do_references_from_item_id_exist(
-                        root_metabox,
-                        item_id,
-                        "thmb".parse().unwrap(),
-                    ))
-                {
-                    master_item_ids.push(item_id);
-                }
-            }
-        }
-        master_item_ids
-    }
-
-    fn get_collection_items(&self) -> IdVec {
-        match self.root_meta_box_info() {
-            Some(m) => m
-                .item_info_map
-                .iter()
-                .filter(|(id, image_info)| self.is_image_item_type(&image_info.item_type))
-                .map(|(id, _)| *id)
-                .collect(),
-            None => IdVec::new(),
-        }
-    }
-
-    fn root_meta_box(&self) -> Option<&MetaBox> {
-        self.metabox_map
-            .get(&self.file_properties.root_meta_box_properties.context_id)
-    }
-
-    fn root_meta_box_info(&self) -> Option<&MetaBoxInfo> {
-        self.metabox_info
-            .get(&self.file_properties.root_meta_box_properties.context_id)
-    }
-
-    fn get_item_by_image_id(&self, image_id: u32) -> Option<&ItemInfoEntry> {
-        match self.root_meta_box() {
-            Some(root) => root.item_info_box().item_by_id(image_id),
-            None => None,
-        }
-    }
-
-    fn get_track_by_sequence_id(&self, sequence_id: u32) -> Option<&TrackInfo> {
-        self.track_info.get(&sequence_id)
-    }
-
-    // fn is_valid_image_item(&self, image_id: u32) -> bool {
-    //     match self.get_item_by_image_id(image_id) {
-    //         Some(info) => self.is_image_item_type(info.item_type()),
-    //         None => false,
-    //     }
-    // }
-
     fn convert_root_meta_box_information(
         &self,
         metabox_properties: &MetaBoxProperties,
-    ) -> MetaBoxInformation {
+    ) -> Result<MetaBoxInformation> {
         let mut item_informations = Vec::new();
         for (id, item) in &metabox_properties.item_features_map {
-            if let Some(root_meta_info) = self.root_meta_box_info() {
-                if let Some(item_info) = root_meta_info.item_info_map.get(id) {
-                    let mut past_references = LinkedList::new();
-                    let root_metabox = self.root_meta_box().unwrap();
-                    let size = self
-                        .get_item_length(root_metabox, *id, &mut past_references)
-                        .unwrap_or(0);
-                    item_informations.push(ItemInformation {
-                        item_id: *id,
-                        item_type: item_info.item_type.clone(),
-                        description: ItemDescription {
-                            name: item_info.name.clone(),
-                            content_type: item_info.content_type.clone(),
-                            content_encoding: item_info.content_encoding.clone(),
-                        },
-                        features: item.feature_mask(),
-                        size,
-                    });
-                }
+            let root_meta_info = self.root_meta_box_info()?;
+            if let Some(item_info) = root_meta_info.item_info_map.get(id) {
+                let mut past_references = LinkedList::new();
+                let root_metabox = self.root_meta_box().unwrap();
+                let size = self
+                    .get_item_length(root_metabox, *id, &mut past_references)
+                    .unwrap_or(0);
+                item_informations.push(ItemInformation {
+                    item_id: *id,
+                    item_type: item_info.item_type.clone(),
+                    description: ItemDescription {
+                        name: item_info.name.clone(),
+                        content_type: item_info.content_type.clone(),
+                        content_encoding: item_info.content_encoding.clone(),
+                    },
+                    features: item.feature_mask(),
+                    size,
+                });
             }
         }
 
-        MetaBoxInformation {
+        Ok(MetaBoxInformation {
             features: metabox_properties.meta_box_feature.feature_mask(),
             item_informations,
             entity_groupings: metabox_properties.entity_groupings.clone(),
-        }
+        })
     }
 
     fn get_item_length(
@@ -844,9 +826,7 @@ impl HeifReader {
         item_id: u32,
         past_references: &mut LinkedList<u32>,
     ) -> Result<usize> {
-        if self.get_item_by_image_id(item_id).is_none() {
-            return Err(HeifError::InvalidItemID);
-        }
+        self.get_item_by_image_id(item_id)?;
 
         let mut found = false;
         for i in past_references.iter_mut() {
@@ -910,6 +890,76 @@ impl HeifReader {
             }
         }
         Ok(item_length)
+    }
+}
+
+impl HeifReader {
+    // Root MetaBox and MetaBoxInfo
+
+    fn root_meta_box(&self) -> Result<&MetaBox> {
+        self.check_initialized(
+            &self.metabox_map[&self.file_properties.root_meta_box_properties.context_id],
+        )
+    }
+
+    fn root_meta_box_info(&self) -> Result<&MetaBoxInfo> {
+        self.check_initialized(
+            &self.metabox_info[&self.file_properties.root_meta_box_properties.context_id],
+        )
+    }
+
+    // Item
+
+    fn get_item_by_image_id(&self, image_id: u32) -> Result<&ItemInfoEntry> {
+        if !self.is_initialized() {
+            return Err(HeifError::Uninitialized);
+        }
+        match self.root_meta_box()?.item_info_box().item_by_id(image_id) {
+            Some(item) => Ok(item),
+            None => Err(HeifError::InvalidItemID),
+        }
+    }
+
+    fn is_valid_image_item(&self, image_id: u32) -> Result<bool> {
+        let item_info_entry = self.get_item_by_image_id(image_id)?;
+        Ok(self.is_image_item_type(item_info_entry.item_type()))
+    }
+
+    fn is_protected(&self, item_id: u32) -> Result<bool> {
+        Ok(self.get_item_by_image_id(item_id)?.is_protected())
+    }
+
+    fn is_image_item_type(&self, item_type: &Byte4) -> bool {
+        let item_type = item_type.to_string();
+        item_type == "avc1"
+            || item_type == "hvc1"
+            || item_type == "grid"
+            || item_type == "iovl"
+            || item_type == "iden"
+            || item_type == "jpeg"
+    }
+
+    // getCollectionItems
+    fn image_item_ids(&self) -> Result<IdVec> {
+        Ok(self
+            .root_meta_box_info()?
+            .item_info_map
+            .iter()
+            .filter(|(id, item_info)| self.is_image_item_type(&item_info.item_type))
+            .map(|(id, _)| *id)
+            .collect())
+    }
+
+    // Track
+
+    fn get_track_by_sequence_id(&self, sequence_id: u32) -> Result<&TrackInfo> {
+        if !self.is_initialized() {
+            return Err(HeifError::Uninitialized);
+        }
+        match self.track_info.get(&sequence_id) {
+            Some(t) => Ok(t),
+            None => Err(HeifError::InvalidSequenceID),
+        }
     }
 }
 
