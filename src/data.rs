@@ -110,9 +110,9 @@ pub enum ItemFeatureEnum {
 }
 
 #[derive(Debug)]
-pub struct DecoderConfiguration<'a> {
+pub struct DecoderConfiguration {
     pub decoder_config_id: u32,
-    pub decoder_specific_info: Vec<DecoderSpecificInfo<'a>>,
+    pub decoder_specific_info: Vec<DecoderSpecificInfo>,
 }
 
 type FeatureBitMask = u32;
@@ -257,7 +257,7 @@ pub struct Rational {
     pub den: u64,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum DecoderSpecInfoType {
     AvcSPS = 7,
     AvcPPS = 8,
@@ -282,9 +282,9 @@ impl DecoderSpecInfoType {
 }
 
 #[derive(Debug)]
-pub struct DecoderSpecificInfo<'a> {
-    pub dec_spec_info_type: &'a DecoderSpecInfoType,
-    pub dec_spec_info_data: &'a Vec<u8>,
+pub struct DecoderSpecificInfo {
+    pub dec_spec_info_type: DecoderSpecInfoType,
+    pub dec_spec_info_data: Vec<u8>,
 }
 
 #[derive(Debug)]

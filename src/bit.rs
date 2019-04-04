@@ -342,10 +342,24 @@ impl BitStream {
     }
 
     pub fn from(file: &mut File) -> Result<Self> {
-        let mut inner = Vec::new();
+        let cap = file.metadata().map_err(|_| HeifError::FileOpen)?.len();
+        let mut inner = Vec::with_capacity(cap as usize);
         file.read_to_end(&mut inner)
             .map_err(|_| HeifError::FileRead)?;
         Ok(BitStream::new(inner))
+    }
+
+    pub fn clear(&mut self) {
+        self.inner.clear();
+        self.bit_offset = 0;
+        self.byte_offset = 0;
+    }
+
+    pub fn slice(&self, offset: usize, size: usize) -> Result<&[u8]> {
+        if offset + size > self.len() {
+            return Err(HeifError::EOF);
+        }
+        Ok(&self.inner[offset..(offset + size)])
     }
 }
 

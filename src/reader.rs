@@ -80,6 +80,7 @@ impl Default for State {
 #[derive(Debug, Default)]
 pub struct HeifReader {
     state: State,
+    stream: BitStream,
     file_properties: FileInformationInternal,
     decoder_code_type_map: HashMap<Id, Byte4>,
     parameter_set_map: HashMap<Id, ParameterSetMap>,
@@ -169,10 +170,7 @@ impl HeifReader {
     pub fn matrix(&self) -> &Vec<i32> {
         &self.matrix
     }
-}
 
-// public
-impl HeifReader {
     pub fn grid_item_by_id(&self, item_id: u32) -> Result<&Grid> {
         if self.is_protected(item_id)? {
             return Err(HeifError::ProtectedItem);
@@ -198,7 +196,7 @@ impl HeifReader {
             .collect())
     }
 
-    pub fn get_item_data_with_decoder_parameters(&self, item_id: u32) -> Result<Vec<u8>> {
+    pub fn get_item_data_with_decoder_parameters(&self, item_id: u32) -> Result<Vec<Vec<u8>>> {
         let item = self.get_item_by_image_id(item_id)?;
         if item.is_protected() {
             return Err(HeifError::ProtectedItem);
@@ -209,24 +207,41 @@ impl HeifReader {
         }
         let decoder_infos = self.get_decoder_parameter_sets(item_id)?;
         let mut data_buf = Vec::new();
-        for config in &decoder_infos.decoder_specific_info {
+        for config in decoder_infos.decoder_specific_info {
             data_buf.push(config.dec_spec_info_data);
         }
-        data_buf.push(self.get_item_data(item_id)?);
-        println!("data_buf {:?}", data_buf);
-        //TODO
-        unimplemented!("get_item_data_with_decoder_parameters")
+        data_buf.push(self.get_item_data(item_id, true)?);
+        Ok(data_buf)
     }
 
-    pub fn get_item_data(&self, item_id: u32) -> Result<&Vec<u8>> {
+    pub fn get_item_data(&self, item_id: u32, byte_stream_headers: bool) -> Result<Vec<u8>> {
         if !self.is_valid_item(item_id)? {
             return Err(HeifError::InvalidItemID);
         }
         let mut past_references = LinkedList::new();
         let root_metabox = self.root_meta_box()?;
-        let item_length = self.get_item_length(root_metabox, item_id, past_references)?;
-        // TODO: read_item_metabox
-        unimplemented!("get_item_data");
+        let item_length = self.get_item_length(root_metabox, item_id, &mut past_references)?;
+        if item_length > self.stream.len() {
+            return Err(HeifError::FileHeader);
+        }
+        let mut buf = self.read_item(root_metabox, item_id, item_length)?;
+        let raw_type = match root_metabox.item_info_box().item_by_id(item_id) {
+            Some(i) => i.item_type(),
+            None => return Err(HeifError::InvalidItemID),
+        };
+        let is_protected = self.is_protected(item_id)?;
+        let process_data = !is_protected && (raw_type == "hvc1" || raw_type == "avc1");
+        if process_data && byte_stream_headers {
+            let code_type = self.get_decoder_code_type(item_id)?;
+            if code_type == "avc1" {
+                unimplemented!("get_item_data avc1");
+            } else if code_type == "hvc1" {
+                process_hevc_item_data(&mut buf);
+            } else {
+                return Err(HeifError::UnsupportedCodeType);
+            }
+        }
+        Ok(buf)
     }
 
     pub fn get_master_image_ids(&self) -> Result<IdVec> {
@@ -261,8 +276,8 @@ impl HeifReader {
         let mut file = File::open(file_path).map_err(|_| HeifError::FileOpen)?;
         self.reset();
 
-        let stream = BitStream::from(&mut file)?;
-        self.read_stream(stream)?;
+        self.stream = BitStream::from(&mut file)?;
+        self.read_stream()?;
 
         self.file_information.root_meta_box_information =
             self.convert_root_meta_box_information(&self.file_properties.root_meta_box_properties)?;
@@ -297,6 +312,7 @@ impl HeifReader {
 
     fn reset(&mut self) {
         self.state = State::Uninitialized;
+        self.stream.clear();
         self.file_properties = FileInformationInternal::default();
         self.decoder_code_type_map.clear();
         self.parameter_set_map.clear();
@@ -310,15 +326,15 @@ impl HeifReader {
         self.track_info.clear();
     }
 
-    fn read_stream(&mut self, mut stream: BitStream) -> Result<()> {
+    fn read_stream(&mut self) -> Result<()> {
         self.state = State::Initializing;
 
         let mut ftyp_found = false;
         let mut metabox_found = false;
         let mut movie_found = false;
 
-        while !stream.is_eof() {
-            let header = BoxHeader::from_stream(&mut stream)?;
+        while !self.stream.is_eof() {
+            let header = BoxHeader::from_stream(&mut self.stream)?;
             let box_type = header.box_type();
             match box_type.to_string().as_str() {
                 "ftyp" => {
@@ -326,28 +342,28 @@ impl HeifReader {
                         return Err(HeifError::FileRead);
                     }
                     ftyp_found = true;
-                    self.read_ftyp(&mut stream, header)?;
+                    self.read_ftyp(header)?;
                 }
                 "meta" => {
                     if metabox_found {
                         return Err(HeifError::FileRead);
                     }
                     metabox_found = true;
-                    self.read_meta(&mut stream, header)?;
+                    self.read_meta(header)?;
                 }
                 "moov" => {
                     if movie_found {
                         return Err(HeifError::FileRead);
                     }
                     movie_found = true;
-                    self.read_moov(&mut stream, header)?;
+                    self.read_moov(header)?;
                 }
                 "mdat" | "free" | "skip" => {
-                    stream.skip_bytes(header.body_size() as usize)?;
+                    self.stream.skip_bytes(header.body_size() as usize)?;
                 }
                 _ => {
                     println!("unknown type {}", box_type.to_string());
-                    stream.skip_bytes(header.body_size() as usize)?;
+                    self.stream.skip_bytes(header.body_size() as usize)?;
                 }
             }
         }
@@ -359,24 +375,22 @@ impl HeifReader {
         Ok(())
     }
 
-    fn read_ftyp(&mut self, stream: &mut BitStream, header: BoxHeader) -> Result<()> {
-        let mut ex = stream.extract_from(&header)?;
+    fn read_ftyp(&mut self, header: BoxHeader) -> Result<()> {
+        let mut ex = self.stream.extract_from(&header)?;
         self.ftyp = FileTypeBox::new(&mut ex, header)?;
         Ok(())
     }
 
-    fn read_meta(&mut self, stream: &mut BitStream, header: BoxHeader) -> Result<()> {
-        let mut ex = stream.extract_from(&header)?;
+    fn read_meta(&mut self, header: BoxHeader) -> Result<()> {
+        let mut ex = self.stream.extract_from(&header)?;
         let context_id = 0;
         self.metabox_map
             .insert(context_id, MetaBox::from_stream_header(&mut ex, header)?);
         let metabox = &self.metabox_map[&context_id];
 
         self.file_properties.root_meta_box_properties = extract_metabox_properties(&metabox);
-        self.metabox_info.insert(
-            context_id,
-            self.extract_items(&stream, &metabox, context_id)?,
-        );
+        self.metabox_info
+            .insert(context_id, self.extract_items(&metabox, context_id)?);
 
         self.process_decoder_config_properties(context_id);
 
@@ -397,18 +411,13 @@ impl HeifReader {
         Ok(())
     }
 
-    fn read_moov(&mut self, stream: &mut BitStream, header: BoxHeader) -> Result<()> {
-        let mut ex = stream.extract_from(&header)?;
+    fn read_moov(&mut self, header: BoxHeader) -> Result<()> {
+        let mut ex = self.stream.extract_from(&header)?;
         let movie_box = MovieBox::new(&mut ex, header)?;
         Ok(())
     }
 
-    fn extract_items(
-        &self,
-        stream: &BitStream,
-        metabox: &MetaBox,
-        context_id: u32,
-    ) -> Result<MetaBoxInfo> {
+    fn extract_items(&self, metabox: &MetaBox, context_id: u32) -> Result<MetaBoxInfo> {
         let mut metabox_info = MetaBoxInfo::default();
         for item in metabox.item_info_box().item_info_list() {
             let item_type = item.item_type();
@@ -416,7 +425,7 @@ impl HeifReader {
                 if item.is_protected() {
                     continue;
                 }
-                let mut ex_stream = self.load_item_data(stream, metabox, item.item_id())?;
+                let mut ex_stream = self.load_item_data(metabox, item.item_id())?;
                 if item_type == "grid" {
                     let image_grid = parse_image_grid(&mut ex_stream)?;
                     metabox_info.grid_items.insert(
@@ -461,32 +470,20 @@ impl HeifReader {
         Ok(item_id_vec)
     }
 
-    fn load_item_data(
-        &self,
-        stream: &BitStream,
-        metabox: &MetaBox,
-        item_id: u32,
-    ) -> Result<BitStream> {
+    fn load_item_data(&self, metabox: &MetaBox, item_id: u32) -> Result<BitStream> {
         let mut past_references = LinkedList::new();
         let item_length = self.get_item_length(metabox, item_id, &mut past_references)?;
-        if !stream.has_bytes(item_length) {
+        if !self.stream.has_bytes(item_length) {
             return Err(HeifError::FileHeader);
         }
         Ok(BitStream::new(self.read_item(
-            stream,
             metabox,
             item_id,
             item_length,
         )?))
     }
 
-    fn read_item(
-        &self,
-        stream: &BitStream,
-        metabox: &MetaBox,
-        item_id: u32,
-        max_size: usize,
-    ) -> Result<Vec<u8>> {
+    fn read_item(&self, metabox: &MetaBox, item_id: u32, max_size: usize) -> Result<Vec<u8>> {
         if !self.is_valid_item(item_id)? {
             return Err(HeifError::InvalidItemID);
         }
@@ -497,6 +494,7 @@ impl HeifReader {
             Some(i) => i,
             None => return Err(HeifError::InvalidItemID),
         };
+
         let construction_method = item_location.construction_method();
         let extent_list = item_location.extent_list();
         let base_offset = item_location.base_offset();
@@ -504,11 +502,18 @@ impl HeifReader {
             return Err(HeifError::FileRead);
         }
 
-        let mut res = Vec::new();
-
+        let mut res = Vec::with_capacity(max_size);
         let mut total_length = 0;
         if version == 0 || (version >= 1 && construction_method == ConstructionMethod::FileOffset) {
-            unimplemented!("fileoffset")
+            for extent in extent_list {
+                let offset = base_offset + extent.extent_offset;
+                if total_length + extent.extent_length > max_size {
+                    return Err(HeifError::FileRead);
+                }
+                let slice = self.stream.slice(offset, extent.extent_length)?;
+                res.append(&mut slice.to_vec());
+                total_length += extent.extent_length;
+            }
         } else if version >= 1 && (construction_method == ConstructionMethod::IdatOffset) {
             for extent in extent_list {
                 let offset = base_offset + extent.extent_offset;
@@ -586,8 +591,8 @@ impl HeifReader {
             .iter()
             .map(
                 |(dec_spec_info_type, dec_spec_info_data)| DecoderSpecificInfo {
-                    dec_spec_info_type,
-                    dec_spec_info_data,
+                    dec_spec_info_type: *dec_spec_info_type,
+                    dec_spec_info_data: dec_spec_info_data.to_vec(),
                 },
             )
             .collect();
@@ -815,7 +820,7 @@ impl HeifReader {
             .item_info_list()
             .iter()
             .filter(|item_info_entry| is_image_item_type(item_info_entry.item_type()))
-            .map(|item_info_entry| item_info_entry.item_id())
+            .map(ItemInfoEntry::item_id)
             .collect())
     }
 
@@ -1067,4 +1072,25 @@ fn extract_item_info_map(metabox: &MetaBox) -> ItemInfoMap {
         );
     }
     item_info_map
+}
+
+fn process_hevc_item_data(buf: &mut Vec<u8>) {
+    let mut output_offset = 0;
+    let mut byte_offset = 0;
+    let len = buf.len();
+    while output_offset < len {
+        let mut nal_length = u32::from(buf[output_offset + byte_offset]);
+        buf[output_offset + byte_offset] = 0;
+        byte_offset += 1;
+        nal_length = (nal_length << 8) | u32::from(buf[output_offset + byte_offset]);
+        buf[output_offset + byte_offset] = 0;
+        byte_offset += 1;
+        nal_length = (nal_length << 8) | u32::from(buf[output_offset + byte_offset]);
+        buf[output_offset + byte_offset] = 0;
+        byte_offset += 1;
+        nal_length = (nal_length << 8) | u32::from(buf[output_offset + byte_offset]);
+        buf[output_offset + byte_offset] = 1;
+        output_offset += (nal_length + 4) as usize;
+        byte_offset = 0;
+    }
 }
